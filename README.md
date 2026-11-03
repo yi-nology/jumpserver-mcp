@@ -96,10 +96,17 @@ jumpserver-mcp --doctor   # 接线 + 堡垒机配置体检
 
 完整工具清单见 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) §6。
 
-### 3.1 工具数看凭据
+### 3.1 工具数与凭据无关（执行面才有关）
 
-管理面**没有**凭据也能注册一部分工具，但完整的 97 个要一个能用的 `JUMPSERVER_TOKEN`。
-`jumpserver-mcp tools` 列的是**当前**真正注册了的工具。
+管理面**始终注册全部 97 个工具**，有没有凭据都一样 —— 注册看的是工具目录，
+不看你配没配 `JUMPSERVER_TOKEN`。**没有凭据时，调用会在进门那一刻失败**
+（报「没配 URL / 没配 token」），而不是那个工具从清单里消失。
+
+⇒ 所以 `jumpserver-mcp tools` 列出的数目**永远是 97**；它不变少，
+少的是「能用」的那部分。
+
+⚠️ **执行面不一样**：它有一个工具（`jmsx_inventory`，查资产清单）需要 REST
+client ⇒ 没有 `JUMPSERVER_TOKEN` 时它**不注册** ⇒ 执行面是 14 而不是 15。
 
 ---
 

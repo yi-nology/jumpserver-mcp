@@ -83,6 +83,16 @@ def launches(path, env):
     ⚠️ 「没答话」有**两种**原因：**起不来**（被系统杀掉）与**起来了但拒绝
     服务**（缺 JUMPSERVER_URL 之类，它自己会退出并说明原因）⇒ 两件事说成
     同一句「起不来」，会把人引到错的地方 ⇒ 失败时把它自己说的话带出来。
+
+    ⚠️ 更要紧的是：**这两件事不能都判成 FAIL**。管理面的服务**按设计**
+    没有 JUMPSERVER_URL 就不启动（它只有 REST 一条路，没配置就没有服务）
+    ⇒ 自检若把它判成「二进制坏了」，每次发布都会报一个假红，而真坏的时候
+    反而没人看了。
+
+    ⇒ 判据：它**自己说了原因**地退出 ⇒ 二进制是好的（把原因带出来）；
+      它**没说话**就退出（被系统杀掉 / 段错误 / 没输出）⇒ 才是真的起不来。
+      ⚠️ panic 也会说话，但它的话里有 "panic:" 与 goroutine 栈 ⇒ 那是崩了，
+      不算「说明原因」。
     """
     p = subprocess.Popen([path], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE, env=env, text=True, bufsize=1)
@@ -98,7 +108,13 @@ def launches(path, env):
         except Exception:
             return False, "不应答 initialize（进程还活着）"
         err = (p.stderr.read() or "").strip().splitlines()
-        return False, ("它退了：" + err[0]) if err else "它退了，但没有输出"
+        if not err:
+            return False, "它退了，但没有输出"
+        text = "\n".join(err)
+        if "panic:" in text or "goroutine " in text:
+            return False, "它崩了：" + err[0]
+        # 它自己说明了为什么不做 ⇒ 二进制起得来，缺的是配置。
+        return True, "它按设计拒绝服务（缺配置）：" + err[0]
     except Exception as e:
         return False, f"起不来：{e}"
     finally:
@@ -152,7 +168,8 @@ def main():
     if rev:
         tag = f"  [{rev[:12]}{' +DIRTY' if mod == 'true' else ''}]"
     print(f"    {'OK  ' if good else 'FAIL'} {dst}   (from {src}){tag}")
-    if not good:
+    if why:
+        # ⚠️ 「它按设计拒绝服务」也要说出来：OK 不等于「它应答了 initialize」。
         print(f"         {why}")
 
     if mod == "true":
