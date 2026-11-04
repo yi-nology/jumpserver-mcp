@@ -135,6 +135,12 @@ type Config struct {
 	// refused at start-up. A surface that answers tool calls to whoever
 	// can reach the port is not a surface this server will serve.
 	HTTPToken string `yaml:"http_token" env:"JMS_HTTP_TOKEN"`
+
+	// The kitex RPC face: where it listens and the per-call token it
+	// demands. Both empty means no RPC face; one without the other is
+	// refused at start-up (same discipline as the HTTP face).
+	RPCAddr  string `yaml:"rpc_addr" env:"JMS_RPC_ADDR"`
+	RPCToken string `yaml:"rpc_token" env:"JMS_RPC_TOKEN"`
 }
 
 // AuditSettings is where this server's trail goes.
@@ -187,6 +193,10 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("JMS_HTTP_ADDR is set but JMS_HTTP_TOKEN is not: the HTTP surface answers " +
 			"tool calls, so it needs a bearer token. Generate one (openssl rand -hex 32) and set " +
 			"JMS_HTTP_TOKEN, or unset JMS_HTTP_ADDR to stay on stdio only")
+	}
+	if cfg.RPCAddr != "" && cfg.RPCToken == "" {
+		return nil, fmt.Errorf("JMS_RPC_ADDR is set but JMS_RPC_TOKEN is not: the RPC face answers " +
+			"tool calls to whoever can reach the port, and there is no auth-off mode")
 	}
 	if cfg.Token == "" && cfg.Username == "" {
 		return nil, fmt.Errorf("a credential is required: JUMPSERVER_TOKEN (a JumpServer PrivateToken) " +

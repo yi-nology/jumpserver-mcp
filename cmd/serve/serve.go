@@ -28,7 +28,9 @@ import (
 	"github.com/oekit/pkg/cli"
 
 	"github.com/yi-nology/jumpserver-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-kit/pkg/faces"
 	"github.com/yi-nology/jumpserver-kit/pkg/httpapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/rpcapi"
 	"github.com/yi-nology/jumpserver-mgmt/biz/router"
 	"github.com/yi-nology/jumpserver-mgmt/internal/config"
 	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
@@ -61,19 +63,37 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 		OnRecord: audit.Trail(cfg.AuditSettings().Options(cfg.ServerName)),
 	})
 
-	if err := httpapi.Run(ctx, r, httpapi.ServeOptions{
-		Options: httpapi.Options{
-			Token:    cfg.HTTPToken,
-			Name:     cfg.ServerName,
-			Version:  version,
-			ReadOnly: cfg.ReadOnly,
-		},
-		Addr:   cfg.HTTPAddr,
-		Stderr: stderr,
-		// This service's own documented example port: the shared refusal
-		// hint must not point at the other plane's port.
-		ExampleAddr: "127.0.0.1:8731",
-	}, args); err != nil {
+	// The faces: HTTP configured ⇒ the REST/MCP-HTTP face rides; RPC
+	// configured ⇒ the kitex face rides. The lifecycle around them is
+	// faces.Run's — one owner, three faces.
+	opts := faces.Options{Stderr: stderr}
+	if cfg.HTTPAddr != "" {
+		opts.HTTP = &httpapi.ServeOptions{
+			Options: httpapi.Options{
+				Token:    cfg.HTTPToken,
+				Name:     cfg.ServerName,
+				Version:  version,
+				ReadOnly: cfg.ReadOnly,
+			},
+			Addr:   cfg.HTTPAddr,
+			Stderr: stderr,
+			// This service's own documented example port: the shared refusal
+			// hint must not point at the other plane's port.
+			ExampleAddr: "127.0.0.1:8731",
+		}
+	}
+	if cfg.RPCAddr != "" {
+		opts.RPC = &rpcapi.ServeOptions{
+			Options: rpcapi.Options{
+				Token:   cfg.RPCToken,
+				Name:    cfg.ServerName,
+				Version: version,
+			},
+			Addr:   cfg.RPCAddr,
+			Stderr: stderr,
+		}
+	}
+	if err := faces.Run(ctx, r, opts, args); err != nil {
 		fmt.Fprintf(stderr, "FATAL  %v\n", err)
 		return cli.ExitError
 	}

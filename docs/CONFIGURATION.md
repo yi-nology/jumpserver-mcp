@@ -149,6 +149,8 @@ jumpserver-mgmt --doctor    # 管理面接线 + 堡垒机配置体检
 | `JMS_SERVER_NAME` | 否 | `jumpserver-mgmt` | 服务在门禁审计留痕里的标识（留痕的 `service` 字段） |
 | `JMS_HTTP_ADDR` | 否 | 无（只 stdio） | **HTTP 面**监听地址（REST `/api/v1/…` + MCP over streamable HTTP `/mcp`）。⚠️ 写 `127.0.0.1:<端口>`，别写 `0.0.0.0` —— 这些路由带着部署自己的凭据去打堡垒机，暴露到网络需要你自己有代理与 TLS 的故事。`serve http` 模式下必填，否则启动拒绝。详见 §3.6 |
 | `JMS_HTTP_TOKEN` | 配了 ADDR 就**是** | 无 | HTTP 面的 **Bearer 令牌**（`openssl rand -hex 32` 生成）。除 `/api/v1/health` 外每个路由都要它。⚠️ **没有「不开认证」模式**：ADDR 有、TOKEN 无 ⇒ 启动即拒。轮换 = 改环境变量重启 |
+| `JMS_RPC_ADDR` | 否 | 无（无 RPC 面） | **kitex RPC 面**监听地址（thrift，`service ExecFace`：`Invoke` + `Catalogue`）。⚠️ 写 `127.0.0.1:<端口>`（例 `127.0.0.1:8741`），别写 `0.0.0.0`。`serve rpc` 模式下必填，否则启动拒绝 |
+| `JMS_RPC_TOKEN` | 配了 ADDR 就**是** | 无 | RPC 面的**逐调用凭据**（每次调用的 `ToolCall.token` 字段，常量时间比较）。⚠️ **没有「不开认证」模式**：ADDR 有、TOKEN 无 ⇒ 启动即拒。目录（`Catalogue`）也要它——无匿名访问 |
 | `JMS_AUDIT` | 否 | `file` | 门禁留痕要不要**落盘**：`file`（每个进程一份 JSONL）或 `off`（只写 stderr） |
 | `JMS_AUDIT_DIR` | 否 | `~/.local/state/jumpserver-mgmt/audit` | 留痕文件放哪（目录 0700、文件 0600）。两个服务写同一个目录 |
 | `JMS_AUDIT_RETENTION_DAYS` | 否 | `7` | 留痕文件保留多少天。**0 或负数 = 不按时间清**（⚠️ 但**空文件**那条规则照样删：安静超过一小时的空文件与保留期无关）。⚠️ 保留期是**文件级**的：超过保留期**且进程已结束**的文件会被清理；正在运行的进程的文件不删 ⇒ 文件里的行可能比这个窗口更老 |
