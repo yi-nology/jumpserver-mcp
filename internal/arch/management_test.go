@@ -120,6 +120,16 @@ func TestTheBinariesAreTheOutermostLayer(t *testing.T) {
 	arch.CheckBinariesAreOutermost(t, tree.Root, tree.ModulePath)
 }
 
+// TestThePlaintextCredentialsAreNotInTheRepository 让凭据不进仓。
+//
+// ⚠️ 本仓的历史里躺过一枚堡垒机管理员的令牌（在发布脚本与 e2e 测试里），
+// 它是**后来**被人手工翻历史才发现的 —— 构建抓不到它，因为脚本里的凭据
+// 是一个完全合法的程序。⇒ 这条守卫扫的是**工作树**：历史里的东西改不掉，
+// 而工作树是还能管住的。
+func TestThePlaintextCredentialsAreNotInTheRepository(t *testing.T) {
+	arch.CheckNoPlaintextCredentials(t, managementRoot(t))
+}
+
 // TestTheEntryLayerIsOneBinaryAtTheRoot 让「一个仓一个二进制」这件事是
 // 机械地成立的。
 //

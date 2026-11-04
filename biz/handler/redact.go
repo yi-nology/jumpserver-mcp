@@ -314,7 +314,10 @@ func redactSecrets(s string) string {
 	if s == "" {
 		return s
 	}
-	s = pemRe.ReplaceAllString(s, "-----BEGIN PRIVATE KEY----- [REDACTED] -----END PRIVATE KEY-----")
+	// ⚠️ 这一行长得像一份私钥，是因为它**就是**私钥头的形状：它是把真私钥
+	// 换成掩码的替换模板 ⇒ 它必须长得一模一样才能替换。⇒ 标记它，让凭据
+	// 守卫知道这是「关于凭据的代码」，不是「一份凭据」。
+	s = pemRe.ReplaceAllString(s, "-----BEGIN PRIVATE KEY----- [REDACTED] -----END PRIVATE KEY-----") // jms:allow-credential
 	s = urlCredentialRe.ReplaceAllString(s, "$1://$2:"+answerMarker+"@")
 	s = flagSecretRe.ReplaceAllStringFunc(s, func(m string) string {
 		sub := flagSecretRe.FindStringSubmatch(m)

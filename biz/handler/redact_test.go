@@ -16,8 +16,8 @@ func TestRedactSecretsMasksValues(t *testing.T) {
 		{"password = hunter2", "hunter2", "password"},
 		{"token: abc123XYZ", "abc123XYZ", "token"},
 		{"mysql -uroot --password=hunter2 db", "hunter2", "--password"},
-		{"Authorization: Bearer eyJhbGciOi.JIUzI1NiJ9", "eyJhbGciOi.JIUzI1NiJ9", "Bearer"},
-		{"-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----", "MIIEow", "REDACTED"},
+		{"Authorization: Bearer eyJhbGciOi.JIUzI1NiJ9", "eyJhbGciOi.JIUzI1NiJ9", "Bearer"},               // jms:allow-credential
+		{"-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----", "MIIEow", "REDACTED"}, // jms:allow-credential
 	}
 	for _, c := range cases {
 		got := redactSecrets(c.in)
@@ -168,7 +168,7 @@ func TestRedactSecretsUsesTheSharedWordList(t *testing.T) {
 // the transcript would stop saying how the caller authenticated.
 func TestRedactSecretsKeepsTheAuthScheme(t *testing.T) {
 	for _, c := range []struct{ in, keep string }{
-		{`Authorization: Bearer eyJhbGciOi.JIUzI1NiJ9`, "Bearer"},
+		{`Authorization: Bearer eyJhbGciOi.JIUzI1NiJ9`, "Bearer"}, // jms:allow-credential
 		{`Authorization: Basic dXNlcjpwYXNz`, "Basic"},
 	} {
 		got := redactSecrets(c.in)
@@ -368,7 +368,7 @@ func TestRedactSecretsIsIdempotent(t *testing.T) {
 		`https://user:pass@host/path`,
 		`curl https://x/api?token=abc&user=bob`,
 		`Authorization: Digest username="x", response="y"`,
-		`Authorization: Bearer eyJhbGciOi.JIUzI1NiJ9`,
+		`Authorization: Bearer eyJhbGciOi.JIUzI1NiJ9`, // jms:allow-credential
 		`x-api-key: value`,
 		`session-token: v`,
 		`description=token=abc`,

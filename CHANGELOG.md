@@ -11,6 +11,35 @@
 
 ### 修复
 
+## [0.4.1] - 2026-11-04
+
+### 变更
+
+- **底座抬到 v0.1.6**（多了明文凭据那条守卫的机械）。
+
+### 新增
+
+- ⚠️ **明文凭据不许进仓**（守卫体在底座 `pkg/arch/credential.go`，本仓的入口是
+  `internal/arch/management_test.go` 里那条
+  `TestThePlaintextCredentialsAreNotInTheRepository`）：
+  - **动机**：本机一个未推送远端的归档仓，其 git 历史里明文躺着一枚堡垒机
+    **admin 用户的 PrivateToken**（40 位十六进制，在发布脚本、校验脚本与
+    e2e 测试里）。三个公开仓全历史 **0 命中**（公网没有它），但它是被人
+    **手工翻历史**才发现的 —— 构建抓不到它，因为脚本里的凭据是一个完全
+    合法的程序。
+  - **判据是「形状 + 语境」两半**：形状（PEM 私钥块 / `Authorization:` 头
+    带值 / 长的十六进制串）说「这可能是秘密」；语境（键名经
+    `redact.IsCredentialKey` 判定为凭据）说「它本来就是一个凭据」。
+    ⚠️ **只认形状会误伤** `.github/workflows/` 里每个 commit SHA pin
+    （40 位十六进制，与令牌同长）。
+  - **行级显式豁免**：`jms:allow-credential` 写在当行或上一行 ⇒ 豁免当行；
+    **每一处豁免都被守卫列出来**（豁免是**记账**的，不是静默的）。
+  - ⚠️ 本仓的 `biz/handler/redact.go`（PEM 替换模板）与
+    `biz/handler/redact_test.go`（PEM/JWT 夹具）逐行加了豁免标记 ——
+    它们**必须**长得一模一样才能匹配。
+
+### 修复
+
 ## [0.4.0] - 2026-11-04
 
 ### 变更

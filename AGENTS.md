@@ -475,6 +475,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
 | 目录一致 | 策略表与注册表必须一一对应（同上） |
 | 契约 | 契约类型必须真被产出（`biz/model/jmsms/contract_test.go`）；**答案本身必须是契约类型**（`internal/arch/management_test.go` 的 `TestTheAnswerTypesAreFoundMechanically`） |
 | 分层 | 底座不得依赖任何服务；不得 import 执行面；IDL/包/模型三名对齐（`internal/arch/`） |
+| **凭据** | 明文凭据不许进仓（底座 `pkg/arch/credential.go` + 本仓 `internal/arch/management_test.go` 的 `TestThePlaintextCredentialsAreNotInTheRepository`）⇒ 形状 + 语境两半都认；`jms:allow-credential` 是**行级**豁免且**被记账** |
 | 工具不许调裸传输 | `biz/handler/protocol_guard_test.go` 扫源码 |
 | 自检 | `./bin/jumpserver-mcp --doctor` 退出码 0 |
 | 真调 | 重启会话后实际调一次新工具；**重启前**可用 JSON-RPC 直接驱动已发布二进制（参考 `script/verify-mcp-launch.py`） |
