@@ -32,6 +32,8 @@ PARENT="$(cd "$ROOT/.." && pwd)"
 
 # 多仓工作集：环境变量优先（`:` 分隔），否则用同级目录约定。
 # ⚠️ 三个仓的名字是**约定**（和守卫用的是同一套）—— 一份拷贝会漂。
+# ⚠️ **另一份在底座仓**：`jumpserver-mcp-kit/script/workset.py` 的
+# `REPO_NAMES`（两个变异脚本读它）。改了这份名单 ⇒ 那边也要改。
 roots() {
   local d
   if [ -n "${JMS_SIBLING_ROOTS:-}" ]; then

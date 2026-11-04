@@ -152,11 +152,11 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
 
 - 底层是 JumpServer REST API，**v4 与 v5 都支持**。**传输、端点表与响应形状在 kit 仓的
   `pkg/jmsapi/`**（两个服务共用一份），本仓的 `internal/repository/` 是它之上的
-  **领域仓储**（资产解析、授权展开、账号归属），`biz/service/` 是再上面的**领域规则**
+  **领域仓储**（资产解析、授权展开、账号归属），`internal/service/` 是再上面的**领域规则**
   （纯函数，可离线单测），`biz/handler/` 只做解码/编排/渲染。
   ⚠️ **响应形状的助手（`Label` / `Display` / `Nested` / `AsSlice` / `List` / `Truncate` /
   `FieldName` / `AssetField` / `AssetSummary` / `SplitAssetLabel`）属于**协议**，
-  一律去 `jmsapi` 取，**别在 `internal/client` 里再写一份** ——
+  一律去 `jmsapi` 取，**别在 `internal/repository` 里再写一份** ——
   曾经两面各写一份，结果管理面修好了 UTF-8 截断、执行面没修（按字节切，多字节字符被切坏）。
   截断的实现在 kit 的 `pkg/textx` **只此一份**（rune 边界那三行出过三次 UTF-8 事故），
   `jmsapi.Truncate` / 留痕的 `clip`/`truncate` 都是它的薄壳，只是后缀语义不同。
@@ -313,7 +313,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
   | 「措辞只有一份」 | `TestTheCapabilityWordingIsNotRewrittenElsewhere`（**跨仓** ⇒ 要三棵树同时在手） |
   | 「每个签委派凭据的地方都要先问能力」 | `TestADelegationCallSiteConsultsTheVersion`（+ `script/mutate-version-guard.py` 的 **7 条变异**钉住它） |
 
-### 2.8 `biz/service/` 装的是「判断」，不是「取数」
+### 2.8 `internal/service/` 装的是「判断」，不是「取数」
 
 现在里面是三组规则，都是纯函数、都有离线单测（不用连堡垒机）：
 - `diagnosis.go` —— 五个诊断类工具共用的词汇：评级（fail 压过 warn）、findings 子集、
@@ -355,7 +355,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
   有一道机械守卫盯着：`biz/handler/protocol_guard_test.go` 扫源码，违规就红。
   要访问堡垒机就去问**资源**（`jmsapi.ResPermissions` 等），网关负责拼 URL。
 
-### 2.10 `biz/policy/policy.go` 是危险分级中枢
+### 2.10 `internal/service/policy/policy.go` 是危险分级中枢
 
 决定哪些操作要 `confirm`、要写什么提示。门禁本身在 kit 的 `pkg/reg/`
 （guardx/invoke 链 + permgate 能力判定）。
