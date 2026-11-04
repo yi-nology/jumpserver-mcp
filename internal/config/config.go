@@ -116,6 +116,25 @@ type Config struct {
 	// the number of restarts — and every query that scans it pays for the
 	// whole history. Zero keeps them all.
 	AuditRetentionDays int `yaml:"audit_retention_days" env:"JMS_AUDIT_RETENTION_DAYS" default:"7"`
+
+	// HTTPAddr is where the HTTP surface listens: the REST face
+	// (/api/v1/…) plus MCP over streamable HTTP (/mcp). Empty means no
+	// HTTP surface — the server speaks stdio only, which is the mode an
+	// MCP runtime launches it in.
+	//
+	// ⚠️ The default is empty ON PURPOSE: turning a stdio server into a
+	// network listener is an operator's decision, not a default. And
+	// 127.0.0.1, not 0.0.0.0 — these routes call the bastion with the
+	// deployment's own credential; exposing that to a network needs a
+	// proxy and a TLS story this process does not have.
+	HTTPAddr string `yaml:"http_addr" env:"JMS_HTTP_ADDR"`
+	// HTTPToken is the bearer token the HTTP surface demands on every
+	// route except /api/v1/health.
+	//
+	// ⚠️ There is no "auth off": JMS_HTTP_ADDR without JMS_HTTP_TOKEN is
+	// refused at start-up. A surface that answers tool calls to whoever
+	// can reach the port is not a surface this server will serve.
+	HTTPToken string `yaml:"http_token" env:"JMS_HTTP_TOKEN"`
 }
 
 // AuditSettings is where this server's trail goes.
@@ -163,6 +182,11 @@ func Load() (*Config, error) {
 	if cfg.BaseURL == "" {
 		return nil, fmt.Errorf("JUMPSERVER_URL is required: the root of your JumpServer deployment, " +
 			"e.g. https://jumpserver.example.com (no trailing /api/v1)")
+	}
+	if cfg.HTTPAddr != "" && cfg.HTTPToken == "" {
+		return nil, fmt.Errorf("JMS_HTTP_ADDR is set but JMS_HTTP_TOKEN is not: the HTTP surface answers " +
+			"tool calls, so it needs a bearer token. Generate one (openssl rand -hex 32) and set " +
+			"JMS_HTTP_TOKEN, or unset JMS_HTTP_ADDR to stay on stdio only")
 	}
 	if cfg.Token == "" && cfg.Username == "" {
 		return nil, fmt.Errorf("a credential is required: JUMPSERVER_TOKEN (a JumpServer PrivateToken) " +

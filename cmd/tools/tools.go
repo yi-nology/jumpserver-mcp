@@ -11,6 +11,7 @@ import (
 
 	"github.com/oekit/pkg/cli"
 
+	"github.com/yi-nology/jumpserver-kit/pkg/httpapi"
 	"github.com/yi-nology/jumpserver-mgmt/biz/router"
 	"github.com/yi-nology/jumpserver-mgmt/internal/config"
 	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
@@ -34,6 +35,24 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 		return cli.ExitError
 	}
 	r := router.New(cfg, c, version, router.Options{})
+
+	// `tools openapi` renders the HTTP surface's OpenAPI document. The
+	// checked-in copy under swagger/ is generated through this exact code
+	// path (script/gen-openapi.sh) — so the document and the tools cannot
+	// drift apart, and the service's own guard compares them.
+	if len(args) > 0 && args[0] == "openapi" {
+		doc, err := httpapi.OpenAPI(r, httpapi.Options{Name: router.FaceName, Version: version, ReadOnly: cfg.ReadOnly})
+		if err != nil {
+			fmt.Fprintf(stderr, "FATAL  %v\n", err)
+			return cli.ExitError
+		}
+		if _, err := stdout.Write(doc); err != nil {
+			fmt.Fprintf(stderr, "FATAL  %v\n", err)
+			return cli.ExitError
+		}
+		return cli.ExitOK
+	}
+
 	tbl := cli.NewTable()
 	for _, spec := range r.Specs() {
 		confirm := ""

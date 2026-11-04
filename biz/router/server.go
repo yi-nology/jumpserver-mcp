@@ -45,11 +45,21 @@ func New(cfg *config.Config, c *repository.Client, version string, opts Options)
 	return r
 }
 
+// FaceName is this binary's name in generated contract documents — the
+// OpenAPI under swagger/ names its face with it.
+//
+// ⚠️ It is deliberately NOT cfg.ServerName: that one is the deployment's
+// identity in the audit trail (JMS_SERVER_NAME may change it), and a
+// checked-in contract document must not change with the environment it
+// was generated on. The trail says who served; the document says what
+// the face IS.
+const FaceName = "jumpserver-mgmt"
+
 // implementation says who this server is.
 func implementation(cfg *config.Config, version string) *mcp.Implementation {
 	name := cfg.ServerName
 	if name == "" {
-		name = "jumpserver-mgmt"
+		name = FaceName
 	}
 	return &mcp.Implementation{Name: name, Version: version}
 }

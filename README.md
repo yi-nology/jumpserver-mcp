@@ -1,7 +1,10 @@
-# jumpserver-mgmt — JumpServer 堡垒机的**管理面** MCP 服务
+# jumpserver-mgmt — JumpServer 堡垒机的**管理面**（MCP + HTTP API）
 
 让 AI agent **经堡垒机**管理你的基础设施：资产、账号、授权、命令过滤、登录 ACL、审计检索 ——
 全程留审计录像。
+
+同一个工具目录、两个面：**MCP**（stdio / streamable HTTP）与 **REST**
+（脚本、人、非 MCP 的调用方直接调）。
 
 > 📖 **同时支持 JumpServer v4 与 v5。** 协议层是同一套（端点表、认证头、连接令牌体、响应形状
 > 逐条对着上游 v4.10.20-lts 源码核过）。v4 没有 Chat AI 委派方案 ⇒ v4 上的会话只能以 API
@@ -59,7 +62,39 @@ chmod +x jumpserver-mgmt-linux-amd64
 ⚠️ 别把 token 写进命令行参数 —— 进程参数同机可见。走环境变量或 `~/.config/jumpserver-mgmt/` 下的
 文件（0600）。
 
-### 2.3 自检
+### 2.3 接线（HTTP 面，可选）
+
+同一个工具目录还有第二个面：**REST + MCP over streamable HTTP**。默认关着，
+配两个环境变量就开：
+
+```json
+"env": {
+  "JUMPSERVER_URL": "https://jumpserver.example.com",
+  "JUMPSERVER_TOKEN": "<你的 PrivateToken>",
+  "JMS_HTTP_ADDR": "127.0.0.1:8731",
+  "JMS_HTTP_TOKEN": "<openssl rand -hex 32 生成一个>"
+}
+```
+
+| 路由 | 干什么 |
+|---|---|
+| `GET /api/v1/health` | 存活探针（**唯一**不要令牌的路由，只报名字/版本/工具数） |
+| `GET /api/v1/tools` | 工具目录：名字、风险、确认要求、入参/出参形状 |
+| `POST /api/v1/tools/{name}/invoke` | 调一个工具（Bearer 令牌） |
+| `/mcp` | MCP over streamable HTTP（Bearer 令牌） |
+
+⚠️ **没有「不开认证」这回事**：`JMS_HTTP_ADDR` 配了却不配 `JMS_HTTP_TOKEN`，启动即拒。
+⚠️ 地址写 `127.0.0.1`，别写 `0.0.0.0` —— 这些路由带着部署自己的凭据去打堡垒机，
+暴露到网络需要你自己有代理与 TLS 的故事。
+⚠️ **调用结果的读法与 stdio 逐字相同**：拒绝、失败、入参不合形状都是 **HTTP 200 +
+`is_error`**（请求没错，结果是拒绝）；请求本身坏才是 400，没有这个工具才是 404。
+契约文档在 [`swagger/openapi.json`](swagger/openapi.json)（生成物，与工具同源）。
+
+只当服务部署时用 `jumpserver-mgmt serve http`（只开 HTTP 面，长跑到信号为止）；
+默认的 `serve` 是 stdio，配了 `JMS_HTTP_ADDR` 会**顺带**开 HTTP —— 一个进程、
+同一道门禁、同一份留痕。
+
+### 2.4 自检
 
 ```bash
 jumpserver-mgmt --doctor   # 接线 + 堡垒机配置体检
@@ -121,6 +156,7 @@ client ⇒ 没有 `JUMPSERVER_TOKEN` 时它**不注册** ⇒ 执行面是 14 而
 | **留痕** | 每次调用一行：调了什么工具、参数是什么、门禁每一段的判定与理由、放行与否、耗时。**被拦下的调用根本没到堡垒机**（堡垒机没有会话可查），所以只有这里查得到 | `pkg/audit`，落盘 JSONL |
 | **脱敏** | 参数、错误、拒绝理由里的凭据按**同一份词表**遮蔽，两个出口（答复 / 留痕）逐字节一致 | `pkg/redact` |
 | **只读模式** | `JMS_READ_ONLY=true` ⇒ 一切会改东西的工具直接拒绝 | 管理面与执行面都支持 |
+| **HTTP 面** | REST 与 MCP over HTTP **共用同一个注册表** ⇒ 同一道门禁、同一套确认、同一份留痕；除 `/api/v1/health` 外全部要 Bearer 令牌（常量时间比较），没有「不开认证」模式 | `pkg/httpapi`（底座） |
 
 > 上面三个 `pkg/*` 现在住在
 > [`jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) —— 它们是两个服务
@@ -150,9 +186,9 @@ client ⇒ 没有 `JUMPSERVER_TOKEN` 时它**不注册** ⇒ 执行面是 14 而
 ├── main.go / init.go / server.go / workers.go / shutdown.go
 │                                ← 入口层（**仓根**的 package main）：serve / doctor / tools / version
 ├── cmd/                        ← 子命令（入口层 import 的**普通包**，不是二进制）
-│   ├── serve/                  ← 默认命令：以 stdio 提供 MCP 服务
+│   ├── serve/                  ← 跑服务：stdio MCP（默认）；`serve http` 只开 HTTP 面
 │   ├── doctor/                 ← 自检：接线与堡垒机配置
-│   └── tools/                  ← 工具目录：名字、风险、确认要求
+│   └── tools/                  ← 工具目录：名字、风险、确认要求；`tools openapi` 生成 HTTP 契约
 ├── biz/                        ← 业务
 │   ├── handler/                ← 97 个工具的实现（一个域一个文件）
 │   ├── model/jmsms/            ← 输出契约的生成物（thriftgo，产物入库）
@@ -164,13 +200,14 @@ client ⇒ 没有 `JUMPSERVER_TOKEN` 时它**不注册** ⇒ 执行面是 14 而
 │   ├── service/                ← 领域规则：纯函数，不碰网络，可离线单测
 │   │   └── policy/             ← 工具目录的风险侧：改不改堡垒机、要不要 confirm
 │   ├── arch/                   ← 机械守卫（见下）
-│   ├── middleware/             ← （空）HTTP 中间件：这一面没有 HTTP
+│   ├── middleware/             ← （空）HTTP 中间件：HTTP 面的认证与路由在底座 pkg/httpapi
 │   └── rpchandler/             ← （空）RPC 服务端：这一面不对外提供 RPC
 ├── idl/jmsms/                  ← 输出契约的 thrift 定义（入口 + 按域拆的多份）
 ├── pkg/                        ← （空）通用库在 kit 仓，不在这里放东西
-├── etc/ swagger/ deploy/ monitoring/ rpcx/ kitex_gen/
+├── swagger/                    ← HTTP 面的 OpenAPI（生成物：`tools openapi`，守卫逐字节比对）
+├── etc/ deploy/ monitoring/ rpcx/ kitex_gen/
 │                                ← （空）hz 骨架里的其余层：见各目录里的 README
-├── script/                     ← 构建 / 发布 / 真机验证脚本
+├── script/                     ← 构建 / 发布 / 生成 / 校验 / 变异自证脚本
 ├── skills/                     ← 给 AI agent 的操作手册（3 个 skill）
 ├── docs/                       ← 配置与排障
 └── AGENTS.md                   ← 给 AI 的迭代指南（改代码前先读）
@@ -210,6 +247,8 @@ main 包** ⇒ 子命令的实现只能在 `cmd/` 下。
 
 - 工具答复必须是**契约类型**，不是手搓的 map（手搓 map 与契约在 JSON 上分不出来）；
 - 凭据词表不许把这个仓自己的参数名误判成凭据（误判 = 留痕不再记录那个参数）；
+- `swagger/openapi.json` 与工具目录**逐字节**对得上（`openapi_test.go`；「会红」这件事
+  由 `script/mutate-swagger-guard.py` 的 4 条变异机械证明）；
 - 两个服务**不得互相 import**；底座**不得依赖任何一个服务**；
 - 每个依赖都被 `go.sum` 钉住、都能从 module cache 恢复。
 

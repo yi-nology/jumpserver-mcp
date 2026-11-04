@@ -147,6 +147,8 @@ jumpserver-mgmt --doctor    # 管理面接线 + 堡垒机配置体检
 | `JMS_BURST` | 否 | `40` | 令牌桶的突发额度 |
 | `JUMPSERVER_TIMEOUT` | 否 | `90s` | 单次 API 调用超时。连通性检查 50 台机器很慢，这个值是故意宽的 |
 | `JMS_SERVER_NAME` | 否 | `jumpserver-mgmt` | 服务在门禁审计留痕里的标识（留痕的 `service` 字段） |
+| `JMS_HTTP_ADDR` | 否 | 无（只 stdio） | **HTTP 面**监听地址（REST `/api/v1/…` + MCP over streamable HTTP `/mcp`）。⚠️ 写 `127.0.0.1:<端口>`，别写 `0.0.0.0` —— 这些路由带着部署自己的凭据去打堡垒机，暴露到网络需要你自己有代理与 TLS 的故事。`serve http` 模式下必填，否则启动拒绝。详见 §3.6 |
+| `JMS_HTTP_TOKEN` | 配了 ADDR 就**是** | 无 | HTTP 面的 **Bearer 令牌**（`openssl rand -hex 32` 生成）。除 `/api/v1/health` 外每个路由都要它。⚠️ **没有「不开认证」模式**：ADDR 有、TOKEN 无 ⇒ 启动即拒。轮换 = 改环境变量重启 |
 | `JMS_AUDIT` | 否 | `file` | 门禁留痕要不要**落盘**：`file`（每个进程一份 JSONL）或 `off`（只写 stderr） |
 | `JMS_AUDIT_DIR` | 否 | `~/.local/state/jumpserver-mgmt/audit` | 留痕文件放哪（目录 0700、文件 0600）。两个服务写同一个目录 |
 | `JMS_AUDIT_RETENTION_DAYS` | 否 | `7` | 留痕文件保留多少天。**0 或负数 = 不按时间清**（⚠️ 但**空文件**那条规则照样删：安静超过一小时的空文件与保留期无关）。⚠️ 保留期是**文件级**的：超过保留期**且进程已结束**的文件会被清理；正在运行的进程的文件不删 ⇒ 文件里的行可能比这个窗口更老 |
@@ -282,6 +284,30 @@ POST /api/v1/authentication/auth/  {"username": "...", "password": "..."}
 ① v4 的列表端点也是**裸数组**；② `perm_account_invalid` 在 v4 上**不是**
 「账号字段不对」，而是**「没人被授权用这个资产」**—— 同一句话两个意思，极易误诊。
 ⚠️ **v4 没有 PrivateToken 的 API 出口** ⇒ **v4 上只能用「账号密码换 Bearer」这一种凭据**。
+
+### 3.6 HTTP 面（REST + MCP over HTTP）
+
+配了 `JMS_HTTP_ADDR` + `JMS_HTTP_TOKEN`（见 §3 表）就开第二个面，**同一个注册表**：
+同一道风险门禁、同一套确认语义、同一份留痕 —— stdio 拒的，这里一样拒。
+
+| 路由 | 干什么 |
+|---|---|
+| `GET /api/v1/health` | 存活探针，**唯一**不要令牌的路由（只报名字 / 版本 / 只读与否 / 工具数） |
+| `GET /api/v1/tools` | 工具目录：名字、风险、确认要求、入参 / 出参形状 |
+| `POST /api/v1/tools/{name}/invoke` | 调一个工具，入参是该工具的 input schema |
+| `GET / POST / DELETE /mcp` | MCP over streamable HTTP（JSON-RPC；GET 是事件流） |
+
+- **结果的读法与 stdio 逐字相同**：拒绝、失败、入参不合形状一律 **HTTP 200 +
+  `is_error=true`**（请求没错，结果是拒绝 / 失败）；请求本身不是 JSON 或不是对象才
+  400；没有这个工具才 404。⇒ 客户端只需要学**一种**错误方言。
+- **两种跑法**：`serve`（默认，stdio）配了 `JMS_HTTP_ADDR` 会**顺带**开 HTTP
+  （一个进程、一份留痕；stdio 断了进程就退，插座跟着没）；`serve http` 只开 HTTP，
+  长跑到 SIGINT/SIGTERM —— 当服务部署用这个。
+- **留痕的 `client` 列是 `rest`**：HTTP 面认证的是**令牌**不是人，留痕不记
+  「alice」。`/api/v1/health` 不留痕（探针不是调用）。
+- **契约文档**：[`swagger/openapi.json`](../swagger/openapi.json)（生成物，与工具
+  同源）；改了工具跑 `./script/gen-openapi.sh` 重新生成，守卫（`openapi_test.go`）
+  拿它逐字节比对。
 
 ---
 

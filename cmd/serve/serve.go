@@ -1,4 +1,10 @@
-// Package serve is the "serve" subcommand: MCP over stdio.
+// Package serve is the "serve" subcommand: the server itself.
+//
+// Two run modes: `serve` is MCP over stdio (the default — the MCP
+// runtime launches the binary with no arguments), and `serve http` is
+// the HTTP face only (REST + MCP over streamable HTTP, for deployment
+// as a service). Either way it is ONE registry behind the faces: one
+// risk gate, one confirm rule, one audit trail.
 //
 // ⚠️ 它是**子命令的实现**，不是二进制：入口层（仓根那个 package main）
 // import 它。一个仓一个二进制 ⇒ cmd/ 下的每个包都只提供「一段活」，
@@ -46,6 +52,21 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 		// that box and was stopped" has no answer anywhere.
 		OnRecord: audit.Trail(cfg.AuditSettings().Options(cfg.ServerName)),
 	})
+
+	if len(args) > 0 && args[0] == "http" {
+		return serveHTTP(ctx, cfg, r, version, stderr)
+	}
+	// stdio mode. The HTTP surface rides along when configured: one
+	// process serves both faces off the same registry, and the socket
+	// goes away with the session that owns the process.
+	if cfg.HTTPAddr != "" {
+		srv, err := startHTTP(cfg, r, version, stderr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FATAL  %v\n", err)
+			return cli.ExitError
+		}
+		defer srv.Close()
+	}
 	if err := r.Serve(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "FATAL  server failed: %v\n", err)
 		return cli.ExitError
