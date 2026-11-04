@@ -46,6 +46,9 @@
 
 ### 修复
 
+- **`jms_access_matrix` 的 API 调用数不再受 limit 约束**（有意，收编的必然代价）：
+  「先排序后截断」要求先为**全部**候选行算出排序键 ⇒ limit=5 在用户很多的堡垒机上
+  会多调若干次 ListSub。部署上可感知，发布说明里记一笔。
 - **列表的顺序 / 计数漂移修正**（收编时暴露；九处：`jms_users_list`、`jms_sessions_live`、
   `jms_job_list`、`jms_accounts_list`、`jms_filter_list`、`jms_filter_preview`、
   `jms_scope_user_groups`、`jms_operate_logs`、`jms_password_change_logs`）：

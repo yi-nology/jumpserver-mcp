@@ -33,7 +33,7 @@
 main.go / init.go / server.go / workers.go / shutdown.go
                              # 入口层（**仓根**的 package main）：serve / doctor / tools / version
 cmd/                        # 子命令（入口层 import 的**普通包**，不是二进制）
-├── serve/                  #   跑服务：stdio MCP（默认）；`serve http` 只开 HTTP 面
+├── serve/                  #   跑服务：stdio MCP（默认）；`serve http` / `serve rpc` / `serve all` 选面
 ├── doctor/                 #   自检：接线与堡垒机配置
 └── tools/                  #   工具目录：名字、风险、确认要求；`tools openapi` 生成 HTTP 契约
 biz/
