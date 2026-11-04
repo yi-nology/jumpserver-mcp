@@ -67,30 +67,28 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 	// configured ⇒ the kitex face rides. The lifecycle around them is
 	// faces.Run's — one owner, three faces.
 	opts := faces.Options{Stderr: stderr}
-	if cfg.HTTPAddr != "" {
-		opts.HTTP = &httpapi.ServeOptions{
-			Options: httpapi.Options{
-				Token:    cfg.HTTPToken,
-				Name:     cfg.ServerName,
-				Version:  version,
-				ReadOnly: cfg.ReadOnly,
-			},
-			Addr:   cfg.HTTPAddr,
-			Stderr: stderr,
-			// This service's own documented example port: the shared refusal
-			// hint must not point at the other plane's port.
-			ExampleAddr: "127.0.0.1:8731",
-		}
+	// Unconditional: the HTTP config (including its ExampleAddr) must
+	// reach faces.plan even when no address is set — the refusal for
+	// `serve http` is exactly the case where Addr is empty, and the hint
+	// needs the example port that only travels on a constructed option.
+	opts.HTTP = &httpapi.ServeOptions{
+		Options: httpapi.Options{
+			Token:    cfg.HTTPToken,
+			Name:     cfg.ServerName,
+			Version:  version,
+			ReadOnly: cfg.ReadOnly,
+		},
+		Addr:   cfg.HTTPAddr,
+		Stderr: stderr,
+		// This service's own documented example port: the shared refusal
+		// hint must not point at the other plane's port.
+		ExampleAddr: "127.0.0.1:8731",
 	}
 	if cfg.RPCAddr != "" {
 		opts.RPC = &rpcapi.ServeOptions{
-			Options: rpcapi.Options{
-				Token:   cfg.RPCToken,
-				Name:    cfg.ServerName,
-				Version: version,
-			},
-			Addr:   cfg.RPCAddr,
-			Stderr: stderr,
+			Options: rpcapi.Options{Token: cfg.RPCToken},
+			Addr:    cfg.RPCAddr,
+			Stderr:  stderr,
 		}
 	}
 	if err := faces.Run(ctx, r, opts, args); err != nil {
