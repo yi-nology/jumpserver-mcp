@@ -176,46 +176,34 @@ func RegisterTranscriptTools(r *reg.Registry, c *repository.Client) {
 			}
 			matcher = repository.NewAssetMatcher(ids, meta)
 		}
-		if matcher != nil {
-			var kept []repository.CommandRecord
-			for _, r := range recs {
-				if matcher.MatchNameAddress(r.Asset, r.Address) {
-					kept = append(kept, r)
-				}
-			}
-			recs = kept
-		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 500)
-		// total is how many command rows matched, before the cap.
-		total := len(recs)
+		// The sort key is the NUMERIC Timestamp, which the contract row does
+		// not carry (it only has the display string), so the rows are put in
+		// that order here and ListSpec keeps it (Less nil).
 		sort.SliceStable(recs, func(i, j int) bool { return recs[i].Timestamp > recs[j].Timestamp })
-		if len(recs) > limit {
-			recs = recs[:limit]
-		}
-		out := make([]jmsms.CommandAuditSummary, 0, len(recs))
-		for _, r := range recs {
-			out = append(out, jmsms.CommandAuditSummary{
-				When:      jms.Opt(r.When),
-				Session:   jms.Opt(r.Session),
-				User:      jms.Opt(r.User),
-				Asset:     jms.Opt(r.Asset),
-				Address:   jms.Opt(r.Address),
-				Account:   jms.Opt(r.Account),
-				Input:     jms.Opt(jmsapi.Truncate(redactSecrets(r.Input), 400)),
-				Output:    jms.Opt(jmsapi.Truncate(redactSecrets(r.Output), 800)),
-				RiskLevel: jms.Opt(r.RiskLevel),
-			})
-		}
-		res := render.ListOf[jmsms.CommandAuditSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(total),
-				Truncated: len(out) < total,
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// counting. total is how many command rows matched, before the cap.
+		return render.Text(render.ListSpec[repository.CommandRecord, jmsms.CommandAuditSummary]{
+			Rows: recs,
+			Keep: func(r repository.CommandRecord) bool {
+				return matcher.MatchNameAddress(r.Asset, r.Address)
 			},
-			Items: out,
-		}
-		return render.Text(res)
+			Map: func(r repository.CommandRecord) jmsms.CommandAuditSummary {
+				return jmsms.CommandAuditSummary{
+					When:      jms.Opt(r.When),
+					Session:   jms.Opt(r.Session),
+					User:      jms.Opt(r.User),
+					Asset:     jms.Opt(r.Asset),
+					Address:   jms.Opt(r.Address),
+					Account:   jms.Opt(r.Account),
+					Input:     jms.Opt(jmsapi.Truncate(redactSecrets(r.Input), 400)),
+					Output:    jms.Opt(jmsapi.Truncate(redactSecrets(r.Output), 800)),
+					RiskLevel: jms.Opt(r.RiskLevel),
+				}
+			},
+			Limit: args.Limit,
+			Def:   50,
+			Max:   500,
+		}.Build())
 	})
 }
 

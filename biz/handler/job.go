@@ -80,36 +80,29 @@ func RegisterJobTools(r *reg.Registry, c *repository.Client) {
 		// The three answers of this tool -- the rehearsal, the refusal and
 		// the run -- are ONE contract type; which fields are filled says
 		// which one this is.
+		//
+		// The judgement and the hint come from risk.Rehearsal, the ONE place
+		// "would this run?" is answered for both planes: the hint was
+		// spelled here twice before (once built by hand for the rehearsal,
+		// once hard-coded as "DANGEROUS" for the refusal — a sentence that
+		// was supposed to name the class it actually found), and two
+		// spellings of one contract drift.
+		would, blocked := risk.Rehearsal(cmdClass, args.Confirm)
 		if args.DryRun {
 			plan.Executed = jms.OptBool(false)
-			// The same judgement the execution plane makes: a rehearsal
-			// would run the command if it needs no confirmation — or if
-			// the confirmation is already there. Without it the trail
-			// cannot tell "this rehearsal would not have run" from "this
-			// answer does not say", and the two planes answer the same
-			// question with different words.
-			would := !risk.RequiresConfirmation(cmdClass) || args.Confirm
 			plan.WouldExecute = jms.OptBool(would)
-			if !would {
-				// ⚠️ The SAME hint the execution plane's rehearsal
-				// carries, in the SAME words: a rehearsal that needs a
-				// confirmation says what is missing. The two planes
-				// answer the same question ("would this run?"), and an
-				// agent that reads one of them has to be able to read
-				// the other the same way.
-				//
+			if blocked != "" {
 				// ⚠️ The trail knows this is not a refusal: a rehearsal
 				// that carries a `blocked` hint is still a rehearsal,
 				// and the trail tells the two apart (see pkg/audit).
-				plan.Blocked = jms.Opt("classified " + cmdClass.String() +
-					"; re-call with confirm=true to execute")
+				plan.Blocked = jms.Opt(blocked)
 			}
 			plan.Note = jms.Opt("dry run: nothing was executed")
 			return render.Text(plan)
 		}
-		if risk.RequiresConfirmation(cmdClass) && !args.Confirm {
+		if !would {
 			plan.Executed = jms.OptBool(false)
-			plan.Blocked = jms.Opt("classified DANGEROUS; re-call with confirm=true to execute")
+			plan.Blocked = jms.Opt(blocked)
 			return render.Text(plan)
 		}
 
@@ -243,41 +236,40 @@ func RegisterJobTools(r *reg.Registry, c *repository.Client) {
 		Description:  "List recent batch executions with outcome and command material. Use it for 'what did the last batch do'; jms_job_audit adds who ran it and the command as it was issued, and jms_job_status adds the per-host outcome of one execution.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.JobExecutionSummary]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args jobListArgs) (*mcp.CallToolResult, any, error) {
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 20, 100)
 		rows, err := c.List(ctx, jmsapi.ResJobExecutions)
 		if err != nil {
 			return render.Err(err)
 		}
-		out := []jmsms.JobExecutionSummary{}
-		for _, e := range rows {
-			material := convert.AnyToStr(e["material"])
-			if args.Search != "" && !strings.Contains(strings.ToLower(material), strings.ToLower(args.Search)) {
-				continue
-			}
-			out = append(out, jmsms.JobExecutionSummary{
-				TaskID:    jms.Opt(convert.AnyToStr(e["id"])),
-				IsSuccess: runSucceeded(e),
-				Summary:   jobSummary(e["summary"]),
-				DateStart: jms.Opt(convert.AnyToStr(e["date_start"])),
-				Material:  jms.Opt(jmsapi.Truncate(material, 200)),
-			})
-			if len(out) >= limit {
-				break
-			}
-		}
-		sort.SliceStable(out, func(i, j int) bool {
-			return out[i].GetDateStart() > out[j].GetDateStart()
-		})
-		res := render.ListOf[jmsms.JobExecutionSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		// filter → map → sort → truncate → count: the order and the three
+		// counting fields come from render.ListSpec, not from this loop.
+		// Two drifts this fixes, both of which misread the moment a search
+		// was used: the loop used to stop at `limit` matches BEFORE sorting
+		// (so the answer was "the first N matches", not "the top N by date"),
+		// and it reported total as the UNFILTERED row count rather than how
+		// many matched.
+		return render.Text(render.ListSpec[map[string]any, jmsms.JobExecutionSummary]{
+			Rows: rows,
+			Keep: func(e map[string]any) bool {
+				if args.Search == "" {
+					return true
+				}
+				material := convert.AnyToStr(e["material"])
+				return strings.Contains(strings.ToLower(material), strings.ToLower(args.Search))
 			},
-			Items: out,
-		}
-		return render.Text(res)
+			Map: func(e map[string]any) jmsms.JobExecutionSummary {
+				return jmsms.JobExecutionSummary{
+					TaskID:    jms.Opt(convert.AnyToStr(e["id"])),
+					IsSuccess: runSucceeded(e),
+					Summary:   jobSummary(e["summary"]),
+					DateStart: jms.Opt(convert.AnyToStr(e["date_start"])),
+					Material:  jms.Opt(jmsapi.Truncate(convert.AnyToStr(e["material"]), 200)),
+				}
+			},
+			Less:  func(a, b jmsms.JobExecutionSummary) bool { return a.GetDateStart() > b.GetDateStart() },
+			Limit: args.Limit,
+			Def:   20,
+			Max:   100,
+		}.Build())
 	})
 
 	type jobStopArgs struct {

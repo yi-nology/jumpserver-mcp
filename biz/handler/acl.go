@@ -42,7 +42,6 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 	"github.com/yi-nology/jumpserver-kit/pkg/render"
@@ -525,43 +524,43 @@ func RegisterDataMaskingTools(r *reg.Registry, c *repository.Client) {
 			"new rule does not duplicate or contradict an existing rule.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.DataMaskingRule]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args maskingListArgs) (*mcp.CallToolResult, any, error) {
-		limit := repository.NormLimit(args.Limit, 50, 200)
 		rows, serverTotal, err := c.ListAllCounted(ctx, string(jmsapi.ResDataMaskingRules), nil)
 		if err != nil {
 			return render.Err(err)
 		}
 		needle := strings.ToLower(strings.TrimSpace(args.Search))
-		out := []jmsms.DataMaskingRule{}
-		matched := 0
-		for _, m := range rows {
-			item := parseMaskingRule(m)
-			if needle != "" {
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting. Less is nil: this list never sorted
+		// locally, and the endpoint's order is what callers already read.
+		res := render.ListSpec[map[string]any, jmsms.DataMaskingRule]{
+			Rows: rows,
+			Keep: func(m map[string]any) bool {
+				if needle == "" {
+					return true
+				}
 				hay := strings.ToLower(jmsapi.Str(m["name"]) + " " + jmsapi.Str(m["fields_pattern"]) + " " +
 					jmsapi.Str(jmsapi.Label(m, "masking_method")) + " " + jmsapi.Str(m["comment"]))
-				if !strings.Contains(hay, needle) {
-					continue
-				}
-			}
-			matched++
-			if len(out) < limit {
-				out = append(out, *item)
-			}
-		}
+				return strings.Contains(hay, needle)
+			},
+			Map: func(m map[string]any) jmsms.DataMaskingRule {
+				return *parseMaskingRule(m)
+			},
+			Limit: args.Limit,
+			Def:   50,
+			Max:   200,
+		}.Build()
 		note := ""
-		if matched == 0 {
+		if res.Total == 0 {
 			if serverTotal == 0 {
 				note = "no masking rule is configured on this bastion"
 			} else {
 				note = "no rule matched the filter (" + strconv.Itoa(serverTotal) + " configured)"
 			}
-		} else if len(out) < matched {
-			note = "showing " + strconv.Itoa(len(out)) + " of " + strconv.Itoa(matched) + "; raise limit to see the rest"
+		} else if res.Truncated {
+			note = "showing " + strconv.Itoa(int(res.Count)) + " of " + strconv.Itoa(int(res.Total)) + "; raise limit to see the rest"
 		}
-		return render.Text(render.ListOf[jmsms.DataMaskingRule]{
-			ListMeta: jms.ListMeta{Count: int32(len(out)), Total: int32(matched), Truncated: len(out) < matched},
-			Items:    out,
-			Note:     note,
-		})
+		res.Note = note
+		return render.Text(res)
 	})
 
 	type maskingCreateArgs struct {
@@ -759,42 +758,42 @@ func RegisterClipboardACLTools(r *reg.Registry, c *repository.Client) {
 			"contradict an existing rule.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.ClipboardACL]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args clipboardListArgs) (*mcp.CallToolResult, any, error) {
-		limit := repository.NormLimit(args.Limit, 50, 200)
 		rows, serverTotal, err := c.ListAllCounted(ctx, string(jmsapi.ResClipboardACLs), nil)
 		if err != nil {
 			return render.Err(err)
 		}
 		needle := strings.ToLower(strings.TrimSpace(args.Search))
-		out := []jmsms.ClipboardACL{}
-		matched := 0
-		for _, m := range rows {
-			item := parseClipboardACL(m)
-			if needle != "" {
-				hay := strings.ToLower(jmsapi.Str(m["name"]) + " " + jmsapi.Str(m["comment"]))
-				if !strings.Contains(hay, needle) {
-					continue
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting. Less is nil: this list never sorted
+		// locally, and the endpoint's order is what callers already read.
+		res := render.ListSpec[map[string]any, jmsms.ClipboardACL]{
+			Rows: rows,
+			Keep: func(m map[string]any) bool {
+				if needle == "" {
+					return true
 				}
-			}
-			matched++
-			if len(out) < limit {
-				out = append(out, *item)
-			}
-		}
+				hay := strings.ToLower(jmsapi.Str(m["name"]) + " " + jmsapi.Str(m["comment"]))
+				return strings.Contains(hay, needle)
+			},
+			Map: func(m map[string]any) jmsms.ClipboardACL {
+				return *parseClipboardACL(m)
+			},
+			Limit: args.Limit,
+			Def:   50,
+			Max:   200,
+		}.Build()
 		note := ""
-		if matched == 0 {
+		if res.Total == 0 {
 			if serverTotal == 0 {
 				note = "no clipboard ACL is configured on this bastion"
 			} else {
 				note = "no rule matched the filter (" + strconv.Itoa(serverTotal) + " configured)"
 			}
-		} else if len(out) < matched {
-			note = "showing " + strconv.Itoa(len(out)) + " of " + strconv.Itoa(matched) + "; raise limit to see the rest"
+		} else if res.Truncated {
+			note = "showing " + strconv.Itoa(int(res.Count)) + " of " + strconv.Itoa(int(res.Total)) + "; raise limit to see the rest"
 		}
-		return render.Text(render.ListOf[jmsms.ClipboardACL]{
-			ListMeta: jms.ListMeta{Count: int32(len(out)), Total: int32(matched), Truncated: len(out) < matched},
-			Items:    out,
-			Note:     note,
-		})
+		res.Note = note
+		return render.Text(res)
 	})
 
 	type clipboardCreateArgs struct {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"sort"
 	"strings"
 
 	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
@@ -139,24 +138,29 @@ func RegisterStatusTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Err(err)
 		}
-		var out []jmsms.PlatformSummary
-		for _, r := range rows {
-			var p map[string]any
-			if json.Unmarshal(r, &p) == nil {
-				out = append(out, jmsms.PlatformSummary{
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting. The platform list is complete by nature, so
+		// it carries no cap (Max 0): truncating it would drop rows the caller
+		// needs while reporting truncated for a list meant to be whole. Rows
+		// that do not parse are filtered, not mapped into empty rows.
+		return render.Text(render.ListSpec[json.RawMessage, jmsms.PlatformSummary]{
+			Rows: rows,
+			Keep: func(r json.RawMessage) bool {
+				var p map[string]any
+				return json.Unmarshal(r, &p) == nil
+			},
+			Map: func(r json.RawMessage) jmsms.PlatformSummary {
+				var p map[string]any
+				_ = json.Unmarshal(r, &p)
+				return jmsms.PlatformSummary{
 					ID:   jmsapi.FieldStr(p["id"]),
 					Name: jmsapi.FieldStr(p["name"]),
 					Type: jmsapi.FieldStr(p["type"]),
-				})
-			}
-		}
-		sort.Slice(out, func(i, j int) bool {
-			return out[i].GetName() < out[j].GetName()
-		})
-		return render.Text(render.ListOf[jmsms.PlatformSummary]{
-			ListMeta: jms.ListMeta{Count: int32(len(out)), Total: int32(len(out)), Truncated: false},
-			Items:    out,
-		})
+				}
+			},
+			Less: func(a, b jmsms.PlatformSummary) bool { return a.GetName() < b.GetName() },
+			Max:  0,
+		}.Build())
 	})
 
 	type assetsListArgs struct {
@@ -174,42 +178,40 @@ func RegisterStatusTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Err(err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 100, 500)
-		out := []jms.AssetSummary{}
-		for _, a := range rows {
-			plat := fmt.Sprint(jmsapi.Nested(a, "platform", "name"))
-			conn := jmsapi.Label(a, "connectivity")
-			if args.Platform != "" && !strings.EqualFold(plat, args.Platform) {
-				continue
-			}
-			if args.Connectivity != "" && !strings.EqualFold(conn, args.Connectivity) {
-				continue
-			}
-			if args.Search != "" {
-				s := strings.ToLower(args.Search)
-				if !strings.Contains(strings.ToLower(jmsapi.Str(a["address"])), s) &&
-					!strings.Contains(strings.ToLower(jmsapi.Str(a["name"])), s) {
-					continue
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields (total is how many assets
+		// matched the filters, before the cap).
+		return render.Text(render.ListSpec[map[string]any, jms.AssetSummary]{
+			Rows: rows,
+			Keep: func(a map[string]any) bool {
+				plat := fmt.Sprint(jmsapi.Nested(a, "platform", "name"))
+				conn := jmsapi.Label(a, "connectivity")
+				if args.Platform != "" && !strings.EqualFold(plat, args.Platform) {
+					return false
 				}
-			}
-			// The shared asset row: the execution plane's inventory
-			// produces the same one, so "which machines are there" has
-			// one answer whichever server is asked.
-			out = append(out, jmsapi.AssetSummary(a))
-		}
-		sort.Slice(out, func(i, j int) bool {
-			return out[i].GetAddress() < out[j].GetAddress()
-		})
-		// total is how many assets matched the filters, before the cap.
-		total := len(out)
-		if len(out) > limit {
-			out = out[:limit]
-		}
-		return render.Text(render.ListOf[jms.AssetSummary]{
-			ListMeta: jms.ListMeta{Count: int32(len(out)), Total: int32(total), Truncated: len(out) < total},
-			Items:    out,
-		})
+				if args.Connectivity != "" && !strings.EqualFold(conn, args.Connectivity) {
+					return false
+				}
+				if args.Search != "" {
+					s := strings.ToLower(args.Search)
+					if !strings.Contains(strings.ToLower(jmsapi.Str(a["address"])), s) &&
+						!strings.Contains(strings.ToLower(jmsapi.Str(a["name"])), s) {
+						return false
+					}
+				}
+				return true
+			},
+			Map: func(a map[string]any) jms.AssetSummary {
+				// The shared asset row: the execution plane's inventory
+				// produces the same one, so "which machines are there" has
+				// one answer whichever server is asked.
+				return jmsapi.AssetSummary(a)
+			},
+			Less:  func(a, b jms.AssetSummary) bool { return a.GetAddress() < b.GetAddress() },
+			Limit: args.Limit,
+			Def:   100,
+			Max:   500,
+		}.Build())
 	})
 
 	type assetGetArgs struct {
@@ -258,40 +260,39 @@ func RegisterStatusTools(r *reg.Registry, c *repository.Client) {
 				assetIDs[id] = true
 			}
 		}
-		// The row carries the account AND the machine it belongs to: a list
-		// of logins without the asset they hang on cannot be acted on.
-		out := []jmsms.AccountSummary{}
-		for _, a := range rows {
-			if assetIDs != nil {
-				aid := fmt.Sprint(jmsapi.Nested(a, "asset", "id"))
-				if !assetIDs[aid] {
-					continue
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting. The totals used to be computed against the
+		// UNFILTERED rows, so an asset filter answered total as "how many
+		// accounts exist on the bastion" while showing only that asset's —
+		// total is now how many matched. No cap (Max 0): this is the whole
+		// set of logins per filter.
+		return render.Text(render.ListSpec[map[string]any, jmsms.AccountSummary]{
+			Rows: rows,
+			Keep: func(a map[string]any) bool {
+				if assetIDs == nil {
+					return true
 				}
-			}
-			out = append(out, jmsms.AccountSummary{
-				Username:      jmsapi.Str(a["username"]),
-				Name:          jmsapi.FieldStr(a["name"]),
-				SecretType:    jmsapi.FieldStr(jmsapi.Label(a, "secret_type")),
-				Privileged:    jmsapi.FieldBool(a["privileged"]),
-				IsActive:      jmsapi.FieldBool(a["is_active"]),
-				Connectivity:  jmsapi.FieldStr(jmsapi.Label(a, "connectivity")),
-				DateLastLogin: jmsapi.FieldStr(a["date_last_login"]),
-				Asset:         jmsapi.FieldStr(jmsapi.FieldName(a, "asset")),
-				Address:       jmsapi.FieldStr(jmsapi.Nested(a, "asset", "address")),
-			})
-		}
-		sort.Slice(out, func(i, j int) bool {
-			return out[i].GetAddress() < out[j].GetAddress()
-		})
-		items := out
-		return render.Text(render.ListOf[jmsms.AccountSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(items)),
-				Total:     int32(len(rows)),
-				Truncated: len(items) < len(rows),
+				return assetIDs[fmt.Sprint(jmsapi.Nested(a, "asset", "id"))]
 			},
-			Items: items,
-		})
+			Map: func(a map[string]any) jmsms.AccountSummary {
+				// The row carries the account AND the machine it belongs to:
+				// a list of logins without the asset they hang on cannot be
+				// acted on.
+				return jmsms.AccountSummary{
+					Username:      jmsapi.Str(a["username"]),
+					Name:          jmsapi.FieldStr(a["name"]),
+					SecretType:    jmsapi.FieldStr(jmsapi.Label(a, "secret_type")),
+					Privileged:    jmsapi.FieldBool(a["privileged"]),
+					IsActive:      jmsapi.FieldBool(a["is_active"]),
+					Connectivity:  jmsapi.FieldStr(jmsapi.Label(a, "connectivity")),
+					DateLastLogin: jmsapi.FieldStr(a["date_last_login"]),
+					Asset:         jmsapi.FieldStr(jmsapi.FieldName(a, "asset")),
+					Address:       jmsapi.FieldStr(jmsapi.Nested(a, "asset", "address")),
+				}
+			},
+			Less: func(a, b jmsms.AccountSummary) bool { return a.GetAddress() < b.GetAddress() },
+			Max:  0,
+		}.Build())
 	})
 
 	type nodesArgs struct{}
@@ -304,20 +305,22 @@ func RegisterStatusTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Err(err)
 		}
-		var out []jmsms.NodeSummary
-		for _, n := range rows {
-			out = append(out, jmsms.NodeSummary{
-				ID:        jmsapi.Str(n["id"]),
-				Name:      jmsapi.Str(n["name"]),
-				FullValue: jmsapi.FieldStr(n["full_value"]),
-				ParentID:  jmsapi.FieldStr(n["parent_id"]),
-				Assets:    jmsapi.FieldInt32(n["assets_amount"]),
-			})
-		}
-		return render.Text(render.ListOf[jmsms.NodeSummary]{
-			ListMeta: jms.ListMeta{Count: int32(len(out)), Total: int32(len(rows)), Truncated: false},
-			Items:    out,
-		})
+		// The node tree is a complete list: no filter, no cap (Max 0). Less
+		// stays nil — this list never sorted locally, and the endpoint's
+		// order is what callers already read.
+		return render.Text(render.ListSpec[map[string]any, jmsms.NodeSummary]{
+			Rows: rows,
+			Map: func(n map[string]any) jmsms.NodeSummary {
+				return jmsms.NodeSummary{
+					ID:        jmsapi.Str(n["id"]),
+					Name:      jmsapi.Str(n["name"]),
+					FullValue: jmsapi.FieldStr(n["full_value"]),
+					ParentID:  jmsapi.FieldStr(n["parent_id"]),
+					Assets:    jmsapi.FieldInt32(n["assets_amount"]),
+				}
+			},
+			Max: 0,
+		}.Build())
 	})
 
 	type permsArgs struct {
@@ -328,43 +331,39 @@ func RegisterStatusTools(r *reg.Registry, c *repository.Client) {
 		Description:  "List asset permissions (who may reach which asset). Use for access-review and least-privilege audits. It reports counts, so use jms_permission_get when you need to know WHO is in one permission.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.PermissionSummary]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args permsArgs) (*mcp.CallToolResult, any, error) {
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 200)
-		q := url.Values{"page_size": {convert.AnyToStr(limit)}, "ordering": {"-date_created"}}
+		// The endpoint ignores page_size and answers with its own cap of
+		// 200 rows, so the caller's limit is applied on this side; the
+		// normalized page_size still goes out for deployments that honour it.
+		q := url.Values{"page_size": {convert.AnyToStr(render.NormLimit(args.Limit, 50, 200))}, "ordering": {"-date_created"}}
 		rows, err := c.ListQuery(ctx, jmsapi.ResPermissions, q)
 		if err != nil {
 			return render.Err(err)
 		}
-		var out []jmsms.PermissionSummary
-		for _, p := range rows {
-			// The endpoint ignores page_size and answers with its own cap of 200
-			// rows, so the limit has to be applied here.
-			if len(out) >= limit {
-				break
-			}
-			// The list endpoint returns assets as null; the counts are what an
-			// access review actually needs.
-			out = append(out, jmsms.PermissionSummary{
-				Name:         jmsapi.Str(p["name"]),
-				IsActive:     jmsapi.FieldBool(p["is_active"]),
-				AssetsAmount: jmsapi.FieldInt32(p["assets_amount"]),
-				UsersAmount:  jmsapi.FieldInt32(p["users_amount"]),
-				NodesAmount:  jmsapi.FieldInt32(p["nodes_amount"]),
-				Accounts:     asStringSlice(p["accounts"]),
-				DateCreated:  jmsapi.FieldStr(p["date_created"]),
-			})
-		}
-		res := render.ListOf[jmsms.PermissionSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// counting. Less is nil: the server already answers in -date_created
+		// order and re-sorting here would only disturb it.
+		res := render.ListSpec[map[string]any, jmsms.PermissionSummary]{
+			Rows: rows,
+			Map: func(p map[string]any) jmsms.PermissionSummary {
+				// The list endpoint returns assets as null; the counts are
+				// what an access review actually needs.
+				return jmsms.PermissionSummary{
+					Name:         jmsapi.Str(p["name"]),
+					IsActive:     jmsapi.FieldBool(p["is_active"]),
+					AssetsAmount: jmsapi.FieldInt32(p["assets_amount"]),
+					UsersAmount:  jmsapi.FieldInt32(p["users_amount"]),
+					NodesAmount:  jmsapi.FieldInt32(p["nodes_amount"]),
+					Accounts:     asStringSlice(p["accounts"]),
+					DateCreated:  jmsapi.FieldStr(p["date_created"]),
+				}
 			},
-			Items: out,
-		}
-		if len(out) >= limit && len(rows) > len(out) {
-			res.Note = "showing the first " + convert.AnyToStr(len(out)) + " of " +
-				convert.AnyToStr(len(rows)) + " permissions"
+			Limit: args.Limit,
+			Def:   50,
+			Max:   200,
+		}.Build()
+		if res.Truncated {
+			res.Note = "showing the first " + convert.AnyToStr(res.Count) + " of " +
+				convert.AnyToStr(res.Total) + " permissions"
 		}
 		return render.Text(res)
 	})

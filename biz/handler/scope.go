@@ -201,44 +201,42 @@ func RegisterGroupTools(r *reg.Registry, c *repository.Client) {
 			}
 		}
 
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 200)
-		out := []jmsms.UserGroupSummary{}
-		for _, g := range rows {
-			name := jmsapi.Str(g["name"])
-			if args.Search != "" && !strings.Contains(strings.ToLower(name), strings.ToLower(args.Search)) {
-				continue
-			}
-			members := []string{}
-			for _, u := range jmsapi.AsSlice(g["users"]) {
-				if m, ok := u.(map[string]any); ok {
-					members = append(members, jmsapi.Str(m["name"]))
-				} else {
-					members = append(members, jmsapi.Str(u))
-				}
-			}
-			sort.Strings(members)
-			id := jmsapi.Str(g["id"])
-			out = append(out, jmsms.UserGroupSummary{
-				ID:            jmsapi.FieldStr(g["id"]),
-				Name:          jmsapi.FieldStr(g["name"]),
-				Members:       members,
-				MembersAmount: jms.OptInt32(int32(len(members))),
-				Permissions:   holds[id],
-			})
-			if len(out) >= limit {
-				break
-			}
-		}
-		res := render.ListOf[jmsms.UserGroupSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting. The totals used to be computed against the
+		// UNFILTERED rows, so a search answered total as "how many groups
+		// exist" rather than how many matched. Less is nil: this list never
+		// sorted locally, and the endpoint's order is what callers read.
+		res := render.ListSpec[map[string]any, jmsms.UserGroupSummary]{
+			Rows: rows,
+			Keep: func(g map[string]any) bool {
+				name := jmsapi.Str(g["name"])
+				return args.Search == "" ||
+					strings.Contains(strings.ToLower(name), strings.ToLower(args.Search))
 			},
-			Items: out,
-		}
-		if len(out) == 0 {
+			Map: func(g map[string]any) jmsms.UserGroupSummary {
+				members := []string{}
+				for _, u := range jmsapi.AsSlice(g["users"]) {
+					if m, ok := u.(map[string]any); ok {
+						members = append(members, jmsapi.Str(m["name"]))
+					} else {
+						members = append(members, jmsapi.Str(u))
+					}
+				}
+				sort.Strings(members)
+				id := jmsapi.Str(g["id"])
+				return jmsms.UserGroupSummary{
+					ID:            jmsapi.FieldStr(g["id"]),
+					Name:          jmsapi.FieldStr(g["name"]),
+					Members:       members,
+					MembersAmount: jms.OptInt32(int32(len(members))),
+					Permissions:   holds[id],
+				}
+			},
+			Limit: args.Limit,
+			Def:   50,
+			Max:   200,
+		}.Build()
+		if res.Count == 0 {
 			res.Note = "this bastion has no user groups; permissions are held by named users only"
 		}
 		return render.Text(res)
@@ -263,36 +261,37 @@ func RegisterTerminalTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		out := []jmsms.TerminalSummary{}
-		matched := 0
-		for _, t := range rows {
-			name := jmsapi.Str(t["name"])
-			typ := jmsapi.Str(t["type"])
-			addr := jmsapi.Str(t["remote_addr"])
-			if args.Search != "" &&
-				!strings.Contains(strings.ToLower(name), strings.ToLower(args.Search)) &&
-				!strings.Contains(strings.ToLower(addr), strings.ToLower(args.Search)) &&
-				!strings.Contains(strings.ToLower(typ), strings.ToLower(args.Search)) {
-				continue
-			}
-			matched++
-			out = append(out, jmsms.TerminalSummary{
-				Name:          jmsapi.FieldStr(t["name"]),
-				Type:          jmsapi.FieldStr(t["type"]),
-				RemoteAddr:    jmsapi.FieldStr(t["remote_addr"]),
-				IsActive:      jms.OptBool(t["is_active"] == true),
-				IsAlive:       jms.OptBool(t["is_alive"] == true),
-				SessionOnline: jms.OptBool(t["session_online"] == true),
-				Comment:       jmsapi.FieldStr(t["comment"]),
-				IsComponent:   jms.OptBool(strings.HasPrefix(name, "[")),
-			})
-		}
-		sort.Slice(out, func(i, j int) bool {
-			return out[i].GetName() < out[j].GetName()
-		})
-		return render.Text(render.ListOf[jmsms.TerminalSummary]{
-			ListMeta: jms.ListMeta{Count: int32(len(out)), Total: int32(matched), Truncated: false},
-			Items:    out,
-		})
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting. No cap (Max 0): the terminal list is
+		// complete by nature and this tool takes no limit, so capping it
+		// would drop rows while reporting truncated for a list meant to be
+		// whole.
+		return render.Text(render.ListSpec[map[string]any, jmsms.TerminalSummary]{
+			Rows: rows,
+			Keep: func(t map[string]any) bool {
+				name := jmsapi.Str(t["name"])
+				typ := jmsapi.Str(t["type"])
+				addr := jmsapi.Str(t["remote_addr"])
+				return args.Search == "" ||
+					strings.Contains(strings.ToLower(name), strings.ToLower(args.Search)) ||
+					strings.Contains(strings.ToLower(addr), strings.ToLower(args.Search)) ||
+					strings.Contains(strings.ToLower(typ), strings.ToLower(args.Search))
+			},
+			Map: func(t map[string]any) jmsms.TerminalSummary {
+				name := jmsapi.Str(t["name"])
+				return jmsms.TerminalSummary{
+					Name:          jmsapi.FieldStr(t["name"]),
+					Type:          jmsapi.FieldStr(t["type"]),
+					RemoteAddr:    jmsapi.FieldStr(t["remote_addr"]),
+					IsActive:      jms.OptBool(t["is_active"] == true),
+					IsAlive:       jms.OptBool(t["is_alive"] == true),
+					SessionOnline: jms.OptBool(t["session_online"] == true),
+					Comment:       jmsapi.FieldStr(t["comment"]),
+					IsComponent:   jms.OptBool(strings.HasPrefix(name, "[")),
+				}
+			},
+			Less: func(a, b jmsms.TerminalSummary) bool { return a.GetName() < b.GetName() },
+			Max:  0,
+		}.Build())
 	})
 }

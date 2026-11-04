@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/oekit/pkg/convert"
-	"github.com/oekit/pkg/pagination"
+	"github.com/yi-nology/jumpserver-kit/pkg/render"
 
 	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
@@ -115,13 +115,11 @@ func UserMatches(display, filter string) bool {
 }
 
 // NormLimit clamps a limit argument to what the endpoint will accept.
+//
+// ⚠️ 实现只有底座 `render.NormLimit` 一份，这里只是指路：曾经两份逐字拷贝并存
+// （一份拷贝会漂），语义以底座为准。
 func NormLimit(v, def, max int) int {
-	policy := pagination.Policy{
-		DefaultPageSize: def,
-		MaxPageSize:     max,
-		OverMax:         pagination.OverMaxFallback,
-	}
-	return policy.NormalizeLimit(v)
+	return render.NormLimit(v, def, max)
 }
 
 // IsUUID reports whether a string has the shape of a JumpServer id.

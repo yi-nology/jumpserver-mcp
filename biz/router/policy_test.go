@@ -20,7 +20,7 @@ import (
 
 // The catalogue and the registration must agree.
 //
-// Two tables describe the same 76 tools: the registration (what the server
+// Two tables describe the same catalogue: the registration (what the server
 // offers) and the policy (what each tool does to the bastion, and what it
 // says when it is called without a confirmation). They drift apart easily —
 // a new tool that nobody classified would be treated as an unclassified write
@@ -29,6 +29,12 @@ import (
 //
 // The check is mechanical on purpose: it is the kind of thing that has to be
 // true at every commit, not something a reviewer should have to remember.
+
+// wantTools is the catalogue's size: the number the skills and the README
+// quote. It is pinned ONCE — two count assertions used to carry two literals,
+// and a third copy in the comment above had already drifted to an older
+// release's number. A change here is a change to the contract with the agent.
+const wantTools = 97
 
 func newRegistry(t *testing.T) *reg.Registry {
 	t.Helper()
@@ -90,8 +96,8 @@ func TestEveryClassifiedToolIsRegistered(t *testing.T) {
 // here is a change to the contract with the agent.
 func TestToolCount(t *testing.T) {
 	r := newRegistry(t)
-	if got := len(r.Specs()); got != 97 {
-		t.Errorf("tool count = %d, want 97", got)
+	if got := len(r.Specs()); got != wantTools {
+		t.Errorf("tool count = %d, want %d", got, wantTools)
 	}
 }
 
@@ -262,8 +268,8 @@ func TestCatalogueRenders(t *testing.T) {
 	if err := json.Unmarshal(b, &specs); err != nil {
 		t.Fatalf("unmarshal specs: %v", err)
 	}
-	if len(specs) != 97 {
-		t.Fatalf("specs = %d, want 97", len(specs))
+	if len(specs) != wantTools {
+		t.Fatalf("specs = %d, want %d", len(specs), wantTools)
 	}
 	for _, s := range specs {
 		if s.Name == "" || s.Description == "" {

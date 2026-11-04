@@ -34,14 +34,12 @@ import (
 	"context"
 	"errors"
 	"net/url"
-	"sort"
 	"strings"
 
 	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/oekit/pkg/convert"
-	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 	"github.com/yi-nology/jumpserver-kit/pkg/render"
@@ -61,8 +59,6 @@ func RegisterTransferTools(r *reg.Registry, c *repository.Client) {
 		Description:  "Query the file transfer trail: who uploaded or downloaded which file onto or off which machine, when, and whether it succeeded. Use it when the question is 'what files went onto this box' -- jms_asset_evidence covers what was TYPED, this covers what was MOVED. The bastion records every transfer the execution plane's jmsx_put_file / jmsx_get_file / jmsx_relay made, so this is the record of those too.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.FileTransferRecord]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args fileTransfersArgs) (*mcp.CallToolResult, any, error) {
-		limit := repository.NormLimit(args.Limit, 30, 200)
-
 		direction := strings.ToLower(strings.TrimSpace(args.Direction))
 		if direction != "" && !transferDirections[direction] {
 			return render.Failf("direction must be one of %s, got %q",
@@ -154,72 +150,64 @@ func RegisterTransferTools(r *reg.Registry, c *repository.Client) {
 			}
 		}
 
-		kept := make([]map[string]any, 0, len(rows))
-		for _, row := range rows {
-			// The asset is a flat "name(address)" label here, so it is
-			// matched on both halves of it rather than on a parsed id --
-			// this endpoint has no asset id field.
-			name := convert.AnyToStr(jmsapi.AssetField(row, "name"))
-			addr := convert.AnyToStr(jmsapi.AssetField(row, "address"))
-			if args.Asset != "" {
-				if !transferAssetMatches(matcher, name, addr, ref) {
-					continue
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting. Sorting before the cap is what keeps the
+		// NEWEST rows rather than whichever rows the endpoint returned
+		// first; total is how many matched the filters, before the cap.
+		res := render.ListSpec[map[string]any, jmsms.FileTransferRecord]{
+			Rows: rows,
+			Keep: func(row map[string]any) bool {
+				// The asset is a flat "name(address)" label here, so it is
+				// matched on both halves of it rather than on a parsed id --
+				// this endpoint has no asset id field.
+				name := convert.AnyToStr(jmsapi.AssetField(row, "name"))
+				addr := convert.AnyToStr(jmsapi.AssetField(row, "address"))
+				if args.Asset != "" {
+					if !transferAssetMatches(matcher, name, addr, ref) {
+						return false
+					}
 				}
-			}
-			// The user filter matches EITHER half of the display string
-			// ("name(username)"), because both halves are things a person
-			// types -- the same rule jms_commands_search and jms_sessions_list
-			// use. The endpoint's own filter is iexact against the whole
-			// string, so `user=opsuser` would match nothing.
-			if args.UserName != "" && !repository.UserMatches(convert.AnyToStr(row["user"]), args.UserName) {
-				continue
-			}
-			if direction != "" && !strings.EqualFold(jmsapi.Label(row, "operate"), direction) {
-				continue
-			}
-			if since != "" && !transferAtOrAfter(row["date_start"], since) {
-				continue
-			}
-			kept = append(kept, row)
-		}
-
-		out := make([]jmsms.FileTransferRecord, 0, len(kept))
-		for _, row := range kept {
-			out = append(out, jmsms.FileTransferRecord{
-				ID:         jmsapi.FieldStr(row["id"]),
-				User:       jmsapi.FieldStr(row["user"]),
-				RemoteAddr: jmsapi.FieldStr(row["remote_addr"]),
-				Asset:      jmsapi.FieldStr(jmsapi.AssetField(row, "name")),
-				Address:    jmsapi.FieldStr(jmsapi.AssetField(row, "address")),
-				Account:    jmsapi.FieldStr(row["account"]),
-				Operate:    jmsapi.FieldStr(jmsapi.Label(row, "operate")),
-				Filename:   jmsapi.FieldStr(row["filename"]),
-				DateStart:  jmsapi.FieldStr(row["date_start"]),
-				IsSuccess:  jmsapi.FieldBool(row["is_success"]),
-				HasFile:    jmsapi.FieldBool(row["has_file"]),
-				Session:    jmsapi.FieldStr(row["session"]),
-			})
-		}
-		// Sort before capping, so the cap keeps the newest rows.
-		sort.SliceStable(out, func(i, j int) bool {
-			return out[i].GetDateStart() > out[j].GetDateStart()
-		})
-		total := len(out)
-		if len(out) > limit {
-			out = out[:limit]
-		}
-		res := render.ListOf[jmsms.FileTransferRecord]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(total),
-				Truncated: total > len(out),
+				// The user filter matches EITHER half of the display string
+				// ("name(username)"), because both halves are things a person
+				// types -- the same rule jms_commands_search and jms_sessions_list
+				// use. The endpoint's own filter is iexact against the whole
+				// string, so `user=opsuser` would match nothing.
+				if args.UserName != "" && !repository.UserMatches(convert.AnyToStr(row["user"]), args.UserName) {
+					return false
+				}
+				if direction != "" && !strings.EqualFold(jmsapi.Label(row, "operate"), direction) {
+					return false
+				}
+				if since != "" && !transferAtOrAfter(row["date_start"], since) {
+					return false
+				}
+				return true
 			},
-			Items: out,
-		}
+			Map: func(row map[string]any) jmsms.FileTransferRecord {
+				return jmsms.FileTransferRecord{
+					ID:         jmsapi.FieldStr(row["id"]),
+					User:       jmsapi.FieldStr(row["user"]),
+					RemoteAddr: jmsapi.FieldStr(row["remote_addr"]),
+					Asset:      jmsapi.FieldStr(jmsapi.AssetField(row, "name")),
+					Address:    jmsapi.FieldStr(jmsapi.AssetField(row, "address")),
+					Account:    jmsapi.FieldStr(row["account"]),
+					Operate:    jmsapi.FieldStr(jmsapi.Label(row, "operate")),
+					Filename:   jmsapi.FieldStr(row["filename"]),
+					DateStart:  jmsapi.FieldStr(row["date_start"]),
+					IsSuccess:  jmsapi.FieldBool(row["is_success"]),
+					HasFile:    jmsapi.FieldBool(row["has_file"]),
+					Session:    jmsapi.FieldStr(row["session"]),
+				}
+			},
+			Less:  func(a, b jmsms.FileTransferRecord) bool { return a.GetDateStart() > b.GetDateStart() },
+			Limit: args.Limit,
+			Def:   30,
+			Max:   200,
+		}.Build()
 		notes := []string{}
-		if total > len(out) {
-			notes = append(notes, "showing the newest "+convert.AnyToStr(len(out))+" of "+
-				convert.AnyToStr(total)+" matching transfers")
+		if res.Truncated {
+			notes = append(notes, "showing the newest "+convert.AnyToStr(res.Count)+" of "+
+				convert.AnyToStr(res.Total)+" matching transfers")
 		}
 		// ⚠️ The server's own count is what the collection HOLDS. If more
 		// rows were read than that, the endpoint does not page (it answered

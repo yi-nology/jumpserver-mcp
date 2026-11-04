@@ -37,7 +37,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/oekit/pkg/convert"
-	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 	"github.com/yi-nology/jumpserver-kit/pkg/render"
@@ -102,44 +101,41 @@ func registerZonesTool(r *reg.Registry, c *repository.Client) {
 			"⚠️ Most machines on this deployment are in NO zone (the zone field is null on them), so a short zone list is the normal state, not a sign that the tool found little. Read-only.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.NetZone]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args zonesArgs) (*mcp.CallToolResult, any, error) {
-		limit := repository.NormLimit(args.Limit, 20, 100)
-
 		rows, err := c.List(ctx, jmsapi.ResZones)
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		out := make([]jmsms.NetZone, 0, len(rows))
-		for _, row := range rows {
-			name := convert.AnyToStr(row["name"])
-			if args.Search != "" && !strings.Contains(strings.ToLower(name), strings.ToLower(args.Search)) {
-				continue
-			}
-			out = append(out, jmsms.NetZone{
-				ID:           jmsapi.FieldStr(row["id"]),
-				Name:         jmsapi.FieldStr(name),
-				Gateways:     zoneGatewayNames(row["gateways"]),
-				Cidrs:        asStringSlice(row["cidrs"]),
-				AssetsAmount: jmsapi.FieldInt32(row["assets_amount"]),
-				AutoAssign:   jmsapi.FieldBool(row["auto_assign"]),
-				Comment:      jmsapi.FieldStr(row["comment"]),
-			})
-		}
-		sort.SliceStable(out, func(i, j int) bool {
-			return out[i].GetName() < out[j].GetName()
-		})
-		total := len(out)
-		if len(out) > limit {
-			out = out[:limit]
-		}
-		res := render.ListOf[jmsms.NetZone]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(total),
-				Truncated: total > len(out),
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields. This list already sorted
+		// before the cap and counted the matches, so the collection changes
+		// nothing about what the answer says.
+		res := render.ListSpec[map[string]any, jmsms.NetZone]{
+			Rows: rows,
+			Keep: func(row map[string]any) bool {
+				if args.Search == "" {
+					return true
+				}
+				name := convert.AnyToStr(row["name"])
+				return strings.Contains(strings.ToLower(name), strings.ToLower(args.Search))
 			},
-			Items: out,
-		}
-		if total == 0 {
+			Map: func(row map[string]any) jmsms.NetZone {
+				name := convert.AnyToStr(row["name"])
+				return jmsms.NetZone{
+					ID:           jmsapi.FieldStr(row["id"]),
+					Name:         jmsapi.FieldStr(name),
+					Gateways:     zoneGatewayNames(row["gateways"]),
+					Cidrs:        asStringSlice(row["cidrs"]),
+					AssetsAmount: jmsapi.FieldInt32(row["assets_amount"]),
+					AutoAssign:   jmsapi.FieldBool(row["auto_assign"]),
+					Comment:      jmsapi.FieldStr(row["comment"]),
+				}
+			},
+			Less:  func(a, b jmsms.NetZone) bool { return a.GetName() < b.GetName() },
+			Limit: args.Limit,
+			Def:   20,
+			Max:   100,
+		}.Build()
+		if res.Total == 0 {
 			res.Note = "this bastion has no network zone; every machine is reached directly"
 		}
 		return render.Text(res)
@@ -161,67 +157,63 @@ func registerGatewaysTool(r *reg.Registry, c *repository.Client) {
 			"⚠️ 'Gateway' is a PLATFORM NAME, not a role: the list includes ordinary network gear (routers, appliances) beside the real jump hosts -- the zone a gateway belongs to is what makes it a hop. Read-only.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.NetGateway]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args gatewaysArgs) (*mcp.CallToolResult, any, error) {
-		limit := repository.NormLimit(args.Limit, 30, 200)
-
 		rows, err := c.List(ctx, jmsapi.ResGateways)
 		if err != nil {
 			return render.Failf("%v", err)
 		}
 		zoneFilter := strings.ToLower(strings.TrimSpace(args.Zone))
-		out := make([]jmsms.NetGateway, 0, len(rows))
-		for _, row := range rows {
-			name := convert.AnyToStr(row["name"])
-			addr := convert.AnyToStr(row["address"])
-			zone := zoneNameOf(row)
-			zoneID := zoneIDOf(row)
-			if zoneFilter != "" &&
-				!strings.EqualFold(zone, zoneFilter) && !strings.EqualFold(zoneID, zoneFilter) {
-				continue
-			}
-			if args.Connectivity != "" &&
-				!strings.EqualFold(jmsapi.Label(row, "connectivity"), args.Connectivity) {
-				continue
-			}
-			if args.Search != "" {
-				q := strings.ToLower(args.Search)
-				if !strings.Contains(strings.ToLower(name+" "+addr), q) {
-					continue
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields. This list already sorted
+		// before the cap and counted the matches, so the collection changes
+		// nothing about what the answer says.
+		res := render.ListSpec[map[string]any, jmsms.NetGateway]{
+			Rows: rows,
+			Keep: func(row map[string]any) bool {
+				name := convert.AnyToStr(row["name"])
+				addr := convert.AnyToStr(row["address"])
+				zone := zoneNameOf(row)
+				zoneID := zoneIDOf(row)
+				if zoneFilter != "" &&
+					!strings.EqualFold(zone, zoneFilter) && !strings.EqualFold(zoneID, zoneFilter) {
+					return false
 				}
-			}
-			out = append(out, jmsms.NetGateway{
-				ID:             jmsapi.FieldStr(row["id"]),
-				Name:           jmsapi.FieldStr(name),
-				Address:        jmsapi.FieldStr(addr),
-				Zone:           jmsapi.FieldStr(zone),
-				Connectivity:   jmsapi.FieldStr(jmsapi.Label(row, "connectivity")),
-				AccountsAmount: jmsapi.FieldInt32(row["accounts_amount"]),
-				NodesDisplay:   asStringSlice(row["nodes_display"]),
-				DateVerified:   jmsapi.FieldStr(row["date_verified"]),
-				DateLastLogin:  jmsapi.FieldStr(row["date_last_login"]),
-				Comment:        jmsapi.FieldStr(row["comment"]),
-			})
-		}
-		sort.SliceStable(out, func(i, j int) bool {
-			return out[i].GetName() < out[j].GetName()
-		})
-		total := len(out)
-		if len(out) > limit {
-			out = out[:limit]
-		}
-		res := render.ListOf[jmsms.NetGateway]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(total),
-				Truncated: total > len(out),
+				if args.Connectivity != "" &&
+					!strings.EqualFold(jmsapi.Label(row, "connectivity"), args.Connectivity) {
+					return false
+				}
+				if args.Search != "" {
+					q := strings.ToLower(args.Search)
+					if !strings.Contains(strings.ToLower(name+" "+addr), q) {
+						return false
+					}
+				}
+				return true
 			},
-			Items: out,
-		}
+			Map: func(row map[string]any) jmsms.NetGateway {
+				return jmsms.NetGateway{
+					ID:             jmsapi.FieldStr(row["id"]),
+					Name:           jmsapi.FieldStr(convert.AnyToStr(row["name"])),
+					Address:        jmsapi.FieldStr(convert.AnyToStr(row["address"])),
+					Zone:           jmsapi.FieldStr(zoneNameOf(row)),
+					Connectivity:   jmsapi.FieldStr(jmsapi.Label(row, "connectivity")),
+					AccountsAmount: jmsapi.FieldInt32(row["accounts_amount"]),
+					NodesDisplay:   asStringSlice(row["nodes_display"]),
+					DateVerified:   jmsapi.FieldStr(row["date_verified"]),
+					DateLastLogin:  jmsapi.FieldStr(row["date_last_login"]),
+					Comment:        jmsapi.FieldStr(row["comment"]),
+				}
+			},
+			Less:  func(a, b jmsms.NetGateway) bool { return a.GetName() < b.GetName() },
+			Limit: args.Limit,
+			Def:   30,
+			Max:   200,
+		}.Build()
 		notes := []string{}
-		if total == 0 {
+		if res.Total == 0 {
 			notes = append(notes, "no gateway asset matches")
 		}
 		down := 0
-		for _, g := range out {
+		for _, g := range res.Items {
 			if g.GetConnectivity() == "err" {
 				down++
 			}

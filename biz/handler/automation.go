@@ -38,14 +38,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/oekit/pkg/convert"
-	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"github.com/yi-nology/jumpserver-kit/pkg/errs"
 	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
@@ -126,40 +124,27 @@ func registerAutomationListTool(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := repository.NormLimit(args.Limit, 20, 100)
-
 		rows, err := c.List(ctx, accountAutomationFamilies[family])
 		if err != nil {
 			return render.Failf("%v", automationError(ctx, err, family))
 		}
-		kept := make([]map[string]any, 0, len(rows))
-		for _, row := range rows {
-			if args.Search != "" &&
-				!strings.Contains(strings.ToLower(convert.AnyToStr(row["name"])), strings.ToLower(args.Search)) {
-				continue
-			}
-			kept = append(kept, row)
-		}
-		out := make([]jmsms.AccountAutomation, 0, len(kept))
-		for _, row := range kept {
-			out = append(out, automationRow(row))
-		}
-		sort.SliceStable(out, func(i, j int) bool {
-			return out[i].GetName() < out[j].GetName()
-		})
-		total := len(out)
-		if len(out) > limit {
-			out = out[:limit]
-		}
-		res := render.ListOf[jmsms.AccountAutomation]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(total),
-				Truncated: total > len(out),
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting. Sorting before the cap keeps the plans in
+		// name order whatever the endpoint's order was; total is how many
+		// matched the search, before the cap.
+		res := render.ListSpec[map[string]any, jmsms.AccountAutomation]{
+			Rows: rows,
+			Keep: func(row map[string]any) bool {
+				return args.Search == "" ||
+					strings.Contains(strings.ToLower(convert.AnyToStr(row["name"])), strings.ToLower(args.Search))
 			},
-			Items: out,
-		}
-		if total == 0 {
+			Map:   automationRow,
+			Less:  func(a, b jmsms.AccountAutomation) bool { return a.GetName() < b.GetName() },
+			Limit: args.Limit,
+			Def:   20,
+			Max:   100,
+		}.Build()
+		if res.Total == 0 {
 			res.Note = "no " + family + " automation plan exists on this bastion"
 		}
 		return render.Text(res)
@@ -353,8 +338,6 @@ func registerAutomationExecutionsTool(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := repository.NormLimit(args.Limit, 20, 100)
-
 		rows, err := c.List(ctx, accountAutomationExecutionFamilies[family])
 		if err != nil {
 			return render.Failf("%v", automationError(ctx, err, family))
@@ -366,43 +349,37 @@ func registerAutomationExecutionsTool(r *reg.Registry, c *repository.Client) {
 				return render.Failf("%v", err)
 			}
 		}
-		out := make([]jmsms.AccountAutomationExecution, 0, len(rows))
-		for _, row := range rows {
-			exec := automationExecutionRow(row)
-			if planID != "" {
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting. Sorting before the cap keeps the NEWEST
+		// runs rather than whichever rows the endpoint returned first;
+		// total is how many matched the filters, before the cap.
+		res := render.ListSpec[map[string]any, jmsms.AccountAutomationExecution]{
+			Rows: rows,
+			Keep: func(row map[string]any) bool {
+				if planID == "" {
+					return true
+				}
+				exec := automationExecutionRow(row)
 				// The row names the plan; match on the id when it is
 				// there, on the name otherwise.
-				if exec.GetAutomationID() != planID && exec.GetAutomation() != planName {
-					continue
-				}
-			}
-			out = append(out, exec)
-		}
-		sort.SliceStable(out, func(i, j int) bool {
-			return out[i].GetDateStart() > out[j].GetDateStart()
-		})
-		total := len(out)
-		if len(out) > limit {
-			out = out[:limit]
-		}
-		res := render.ListOf[jmsms.AccountAutomationExecution]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(total),
-				Truncated: total > len(out),
+				return exec.GetAutomationID() == planID || exec.GetAutomation() == planName
 			},
-			Items: out,
-		}
+			Map:   automationExecutionRow,
+			Less:  func(a, b jmsms.AccountAutomationExecution) bool { return a.GetDateStart() > b.GetDateStart() },
+			Limit: args.Limit,
+			Def:   20,
+			Max:   100,
+		}.Build()
 		failed := 0
-		for _, e := range out {
+		for _, e := range res.Items {
 			if e.GetStatus() == "failed" {
 				failed++
 			}
 		}
 		notes := []string{}
-		if total > len(out) {
-			notes = append(notes, "showing the newest "+convert.AnyToStr(len(out))+" of "+
-				convert.AnyToStr(total)+" executions")
+		if res.Truncated {
+			notes = append(notes, "showing the newest "+convert.AnyToStr(res.Count)+" of "+
+				convert.AnyToStr(res.Total)+" executions")
 		}
 		if failed > 0 {
 			// ⚠️ The reason is NOT available: the upstream execution
@@ -468,8 +445,6 @@ func registerAutomationRecordsTool(r *reg.Registry, c *repository.Client) {
 			return render.Failf("the %s family has no per-account result record: "+
 				"what a gather produces is the DISCOVERED ACCOUNTS -- read them with jms_gathered_accounts", family)
 		}
-		limit := repository.NormLimit(args.Limit, 30, 200)
-
 		rows, err := c.List(ctx, recordRes)
 		if err != nil {
 			return render.Failf("%v", automationError(ctx, err, family))
@@ -482,40 +457,36 @@ func registerAutomationRecordsTool(r *reg.Registry, c *repository.Client) {
 			}
 			matcher = repository.NewAssetMatcher(ids, meta)
 		}
-		out := make([]jmsms.AccountAutomationRecord, 0, len(rows))
-		for _, row := range rows {
-			asset := convert.AnyToStr(row["asset"])
-			name, addr := jmsapi.SplitAssetLabel(asset)
-			if matcher != nil && !matcher.MatchNameAddress(name, addr) {
-				continue
-			}
-			out = append(out, jmsms.AccountAutomationRecord{
-				ID:           jmsapi.FieldStr(row["id"]),
-				Asset:        jmsapi.FieldStr(name),
-				Address:      jmsapi.FieldStr(addr),
-				Account:      jmsapi.FieldStr(row["account"]),
-				IsSuccess:    jmsapi.FieldBool(row["is_success"]),
-				Status:       jmsapi.FieldStr(row["status"]),
-				DateFinished: jmsapi.FieldStr(row["date_finished"]),
-				Error:        jmsapi.FieldStr(row["error"]),
-			})
-		}
-		sort.SliceStable(out, func(i, j int) bool {
-			return out[i].GetDateFinished() > out[j].GetDateFinished()
-		})
-		total := len(out)
-		if len(out) > limit {
-			out = out[:limit]
-		}
-		res := render.ListOf[jmsms.AccountAutomationRecord]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(total),
-				Truncated: total > len(out),
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting. Sorting before the cap keeps the newest
+		// results; total is how many matched the asset filter, before the
+		// cap.
+		res := render.ListSpec[map[string]any, jmsms.AccountAutomationRecord]{
+			Rows: rows,
+			Keep: func(row map[string]any) bool {
+				asset := convert.AnyToStr(row["asset"])
+				name, addr := jmsapi.SplitAssetLabel(asset)
+				return matcher.MatchNameAddress(name, addr)
 			},
-			Items: out,
-		}
-		if total == 0 {
+			Map: func(row map[string]any) jmsms.AccountAutomationRecord {
+				name, addr := jmsapi.SplitAssetLabel(convert.AnyToStr(row["asset"]))
+				return jmsms.AccountAutomationRecord{
+					ID:           jmsapi.FieldStr(row["id"]),
+					Asset:        jmsapi.FieldStr(name),
+					Address:      jmsapi.FieldStr(addr),
+					Account:      jmsapi.FieldStr(row["account"]),
+					IsSuccess:    jmsapi.FieldBool(row["is_success"]),
+					Status:       jmsapi.FieldStr(row["status"]),
+					DateFinished: jmsapi.FieldStr(row["date_finished"]),
+					Error:        jmsapi.FieldStr(row["error"]),
+				}
+			},
+			Less:  func(a, b jmsms.AccountAutomationRecord) bool { return a.GetDateFinished() > b.GetDateFinished() },
+			Limit: args.Limit,
+			Def:   30,
+			Max:   200,
+		}.Build()
+		if res.Total == 0 {
 			res.Note = "no per-account record exists for this family"
 		}
 		return render.Text(res)

@@ -107,41 +107,44 @@ func RegisterGatherTools(r *reg.Registry, c *repository.Client) {
 			kept = append(kept, m)
 		}
 		rows = kept
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 500)
-		out := []jmsms.GatheredAccountSummary{}
+		// The drift list describes the rows the answer SHOWS: the old loop
+		// stopped collecting drift at the cap, and this keeps that boundary
+		// (Less is nil, so the shown rows are the first N in source order).
+		limit := render.NormLimit(args.Limit, 50, 500)
 		drift := []string{}
-		for _, m := range rows {
-			if len(out) >= limit {
+		for i, m := range rows {
+			if i >= limit {
 				break
 			}
-			entry := jmsms.GatheredAccountSummary{
-				ID:            jmsapi.FieldStr(m["id"]),
-				Username:      jmsapi.FieldStr(m["username"]),
-				Asset:         jmsapi.FieldStr(jmsapi.Nested(m, "asset", "name")),
-				Address:       jmsapi.FieldStr(jmsapi.Nested(m, "asset", "address")),
-				Status:        jmsapi.FieldStr(jmsapi.Label(m, "status")),
-				Present:       jmsapi.FieldBool(m["present"]),
-				RemotePresent: jmsapi.FieldBool(m["remote_present"]),
-				DateUpdated:   jmsapi.FieldStr(m["date_updated"]),
-				DateLastLogin: jmsapi.FieldStr(m["date_last_login"]),
-			}
-			if d := asDetail(m["detail"]); d != "" {
-				entry.Detail = jms.Opt(jmsapi.Truncate(d, 700))
-			}
-			out = append(out, entry)
 			if m["present"] == false {
 				drift = append(drift, fmt.Sprintf("%s@%v", m["username"], jmsapi.Nested(m, "asset", "name")))
 			}
 		}
-		res := render.ListOf[jmsms.GatheredAccountSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		// filter -> map -> sort -> truncate -> count: the server-side filter
+		// and the verified asset subset are applied above, so Keep is nil.
+		res := render.ListSpec[map[string]any, jmsms.GatheredAccountSummary]{
+			Rows: rows,
+			Map: func(m map[string]any) jmsms.GatheredAccountSummary {
+				entry := jmsms.GatheredAccountSummary{
+					ID:            jmsapi.FieldStr(m["id"]),
+					Username:      jmsapi.FieldStr(m["username"]),
+					Asset:         jmsapi.FieldStr(jmsapi.Nested(m, "asset", "name")),
+					Address:       jmsapi.FieldStr(jmsapi.Nested(m, "asset", "address")),
+					Status:        jmsapi.FieldStr(jmsapi.Label(m, "status")),
+					Present:       jmsapi.FieldBool(m["present"]),
+					RemotePresent: jmsapi.FieldBool(m["remote_present"]),
+					DateUpdated:   jmsapi.FieldStr(m["date_updated"]),
+					DateLastLogin: jmsapi.FieldStr(m["date_last_login"]),
+				}
+				if d := asDetail(m["detail"]); d != "" {
+					entry.Detail = jms.Opt(jmsapi.Truncate(d, 700))
+				}
+				return entry
 			},
-			Items: out,
-		}
+			Limit: args.Limit,
+			Def:   50,
+			Max:   500,
+		}.Build()
 		if len(drift) > 0 {
 			sort.Strings(drift)
 			// The envelope has one slot for prose and none for a list, so the
@@ -490,31 +493,23 @@ func RegisterLabelRoleTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 200)
-		out := []jmsms.LabelSummary{}
-		for _, m := range rows {
-			if len(out) >= limit {
-				break
-			}
-			out = append(out, jmsms.LabelSummary{
-				ID:       jmsapi.FieldStr(m["id"]),
-				Name:     jmsapi.FieldStr(m["name"]),
-				Value:    jmsapi.FieldStr(m["value"]),
-				Color:    jmsapi.FieldStr(m["color"]),
-				Comment:  jmsapi.FieldStr(m["comment"]),
-				ResCount: jmsapi.FieldInt32(m["res_count"]),
-			})
-		}
-		res := render.ListOf[jmsms.LabelSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		// filter -> map -> sort -> truncate -> count: endpoint order, no filter.
+		return render.Text(render.ListSpec[map[string]any, jmsms.LabelSummary]{
+			Rows: rows,
+			Map: func(m map[string]any) jmsms.LabelSummary {
+				return jmsms.LabelSummary{
+					ID:       jmsapi.FieldStr(m["id"]),
+					Name:     jmsapi.FieldStr(m["name"]),
+					Value:    jmsapi.FieldStr(m["value"]),
+					Color:    jmsapi.FieldStr(m["color"]),
+					Comment:  jmsapi.FieldStr(m["comment"]),
+					ResCount: jmsapi.FieldInt32(m["res_count"]),
+				}
 			},
-			Items: out,
-		}
-		return render.Text(res)
+			Limit: args.Limit,
+			Def:   50,
+			Max:   200,
+		}.Build())
 	})
 
 	type labelCreateArgs struct {
@@ -578,44 +573,37 @@ func RegisterLabelRoleTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 100, 500)
-		out := []jmsms.LabelResourceSummary{}
-		for _, m := range rows {
-			if len(out) >= limit {
-				break
-			}
-			resID := jmsapi.Str(m["res_id"])
-			// The bastion hands the resource over as a display string
-			// ("name(address)"), so the name and the address have to be
-			// split out of it. Copying it verbatim would make name a
-			// duplicate of resource and leave the address empty.
-			//
-			// There is a second endpoint that lists the resources a label is
-			// bound to, and it was consulted for the name and the address.
-			// It carries neither: it answers with the id and the SAME
-			// display string, so all it added was a second copy of the name
-			// and an empty address.
-			resource := jmsapi.Str(m["resource"])
-			name, address := jmsapi.SplitAssetLabel(resource)
-			out = append(out, jmsms.LabelResourceSummary{
-				Label:    jmsapi.FieldStr(jmsapi.Nested(m, "label", "display_name")),
-				ResType:  jmsapi.FieldStr(jmsapi.Display(m, "res_type")),
-				ResID:    jmsapi.FieldStr(resID),
-				Resource: jmsapi.FieldStr(resource),
-				Name:     jmsapi.FieldStr(name),
-				Address:  jmsapi.FieldStr(address),
-			})
-		}
-		res := render.ListOf[jmsms.LabelResourceSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		// filter -> map -> sort -> truncate -> count: endpoint order, no filter.
+		res := render.ListSpec[map[string]any, jmsms.LabelResourceSummary]{
+			Rows: rows,
+			Map: func(m map[string]any) jmsms.LabelResourceSummary {
+				resID := jmsapi.Str(m["res_id"])
+				// The bastion hands the resource over as a display string
+				// ("name(address)"), so the name and the address have to be
+				// split out of it. Copying it verbatim would make name a
+				// duplicate of resource and leave the address empty.
+				//
+				// There is a second endpoint that lists the resources a label is
+				// bound to, and it was consulted for the name and the address.
+				// It carries neither: it answers with the id and the SAME
+				// display string, so all it added was a second copy of the name
+				// and an empty address.
+				resource := jmsapi.Str(m["resource"])
+				name, address := jmsapi.SplitAssetLabel(resource)
+				return jmsms.LabelResourceSummary{
+					Label:    jmsapi.FieldStr(jmsapi.Nested(m, "label", "display_name")),
+					ResType:  jmsapi.FieldStr(jmsapi.Display(m, "res_type")),
+					ResID:    jmsapi.FieldStr(resID),
+					Resource: jmsapi.FieldStr(resource),
+					Name:     jmsapi.FieldStr(name),
+					Address:  jmsapi.FieldStr(address),
+				}
 			},
-			Items: out,
-		}
-		if len(out) == 0 {
+			Limit: args.Limit,
+			Def:   100,
+			Max:   500,
+		}.Build()
+		if res.Total == 0 {
 			res.Note = "no resource carries this label yet; add one with jms_label_attach"
 		}
 		return render.Text(res)
@@ -730,31 +718,23 @@ func RegisterLabelRoleTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 200)
-		out := []jmsms.RoleSummary{}
-		for _, m := range rows {
-			if len(out) >= limit {
-				break
-			}
-			out = append(out, jmsms.RoleSummary{
-				ID:          jmsapi.FieldStr(m["id"]),
-				Name:        jmsapi.FieldStr(m["name"]),
-				DisplayName: jmsapi.FieldStr(m["display_name"]),
-				Scope:       jmsapi.FieldStr(jmsapi.Label(m, "scope")),
-				Builtin:     jmsapi.FieldBool(m["builtin"]),
-				UsersAmount: jmsapi.FieldInt32(m["users_amount"]),
-			})
-		}
-		res := render.ListOf[jmsms.RoleSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		// filter -> map -> sort -> truncate -> count: endpoint order, no filter.
+		return render.Text(render.ListSpec[map[string]any, jmsms.RoleSummary]{
+			Rows: rows,
+			Map: func(m map[string]any) jmsms.RoleSummary {
+				return jmsms.RoleSummary{
+					ID:          jmsapi.FieldStr(m["id"]),
+					Name:        jmsapi.FieldStr(m["name"]),
+					DisplayName: jmsapi.FieldStr(m["display_name"]),
+					Scope:       jmsapi.FieldStr(jmsapi.Label(m, "scope")),
+					Builtin:     jmsapi.FieldBool(m["builtin"]),
+					UsersAmount: jmsapi.FieldInt32(m["users_amount"]),
+				}
 			},
-			Items: out,
-		}
-		return render.Text(res)
+			Limit: args.Limit,
+			Def:   50,
+			Max:   200,
+		}.Build())
 	})
 
 	type rolePermsArgs struct {
@@ -807,50 +787,47 @@ func RegisterLabelRoleTools(r *reg.Registry, c *repository.Client) {
 			}
 			return p
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 100, 1000)
-		flat, total := []jmsms.RolePermissionSummary{}, 0
+		// filter -> map -> sort -> truncate -> count.
+		// ⚠️ Counting correction: the old `total` was bumped BEFORE the
+		// search filter (it counted every valid path, including the ones the
+		// filter drops) and its Truncated bit said true whenever the filter
+		// narrowed the list -- filtered-out and capped were one bit. Here
+		// total is the matched set and Truncated is a real cap only (same
+		// correction as jms_accounts_list).
+		paths := []string{}
 		for _, m := range rows {
 			t := jmsapi.Str(m["title"])
 			if t == "" {
 				continue
 			}
-			p := full(t)
-			if p == "" {
-				continue
+			if p := full(t); p != "" {
+				paths = append(paths, p)
 			}
-			total++
-			if args.Search != "" && !strings.Contains(strings.ToLower(p), strings.ToLower(args.Search)) {
-				continue
-			}
-			flat = append(flat, jmsms.RolePermissionSummary{Path: p})
 		}
-		sort.Slice(flat, func(i, j int) bool {
-			return flat[i].Path < flat[j].Path
-		})
-		truncated := false
-		if len(flat) > limit {
-			flat = flat[:limit]
-			truncated = true
-		}
-		res := render.ListOf[jmsms.RolePermissionSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(flat)),
-				Total:     int32(total),
-				Truncated: len(flat) < total,
+		res := render.ListSpec[string, jmsms.RolePermissionSummary]{
+			Rows: paths,
+			Keep: func(p string) bool {
+				return args.Search == "" || strings.Contains(strings.ToLower(p), strings.ToLower(args.Search))
 			},
-			Items: flat,
-			// Which role these paths belong to: the rows are the
-			// permissions, and the envelope has no room for the role's own
-			// fields. Both the name the caller asked with and the uuid it
-			// resolved to are here, because the rest of the tools take the
-			// uuid.
-			Note: "role: " + args.Role + " (" + id + ")",
+			Map: func(p string) jmsms.RolePermissionSummary {
+				return jmsms.RolePermissionSummary{Path: p}
+			},
+			Less:  func(a, b jmsms.RolePermissionSummary) bool { return a.Path < b.Path },
+			Limit: args.Limit,
+			Def:   100,
+			Max:   1000,
+		}.Build()
+		// Which role these paths belong to: the rows are the
+		// permissions, and the envelope has no room for the role's own
+		// fields. Both the name the caller asked with and the uuid it
+		// resolved to are here, because the rest of the tools take the
+		// uuid.
+		note := "role: " + args.Role + " (" + id + ")"
+		if res.Truncated {
+			note += fmt.Sprintf("; %d of %d permissions shown; raise limit or narrow with filter",
+				res.Count, res.Total)
 		}
-		if truncated {
-			res.Note += fmt.Sprintf("; %d of %d permissions shown; raise limit or narrow with filter",
-				len(flat), total)
-		}
+		res.Note = note
 		return render.Text(res)
 	})
 }

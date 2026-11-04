@@ -65,59 +65,63 @@ func RegisterSecurityTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 500)
-		out := []jmsms.OperateLogSummary{}
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields. Two drifts this fixes, both of
+		// which misread the moment a filter was used: total used to be the
+		// UNFILTERED row count rather than how many matched, and truncated
+		// used to be true whenever a filter dropped anything. Less stays nil:
+		// this list never sorted locally and the endpoint's order is what
+		// callers read.
 		types := map[string]int{}
-		for _, m := range rows {
-			rt := jmsapi.Str(m["resource_type"])
-			act := jmsapi.Label(m, "action")
-			if args.UserName != "" && !strings.Contains(strings.ToLower(jmsapi.Str(m["user"])),
-				strings.ToLower(args.UserName)) {
-				continue
-			}
-			if args.Action != "" && !strings.EqualFold(act, args.Action) {
-				continue
-			}
-			if args.Type != "" && !strings.Contains(strings.ToLower(rt), strings.ToLower(args.Type)) {
-				continue
-			}
-			if args.Resource != "" && !strings.Contains(strings.ToLower(jmsapi.Str(m["resource"])),
-				strings.ToLower(args.Resource)) {
-				continue
-			}
-			if args.Since != "" && !strings.HasPrefix(jmsapi.Str(m["datetime"]), args.Since[:min(len(args.Since), 13)]) {
-				continue
-			}
-			types[rt]++
-			if len(out) >= limit {
-				continue // keep counting the profile even past the limit
-			}
-			out = append(out, jmsms.OperateLogSummary{
-				Datetime:     jmsapi.FieldStr(m["datetime"]),
-				User:         jmsapi.FieldStr(m["user"]),
-				Action:       jmsapi.FieldStr(act),
-				ResourceType: jmsapi.FieldStr(rt),
-				Resource:     jmsapi.FieldStr(m["resource"]),
-				RemoteAddr:   jmsapi.FieldStr(m["remote_addr"]),
-			})
-		}
-		res := render.ListOf[jmsms.OperateLogSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		res := render.ListSpec[map[string]any, jmsms.OperateLogSummary]{
+			Rows: rows,
+			Keep: func(m map[string]any) bool {
+				rt := jmsapi.Str(m["resource_type"])
+				act := jmsapi.Label(m, "action")
+				if args.UserName != "" && !strings.Contains(strings.ToLower(jmsapi.Str(m["user"])),
+					strings.ToLower(args.UserName)) {
+					return false
+				}
+				if args.Action != "" && !strings.EqualFold(act, args.Action) {
+					return false
+				}
+				if args.Type != "" && !strings.Contains(strings.ToLower(rt), strings.ToLower(args.Type)) {
+					return false
+				}
+				if args.Resource != "" && !strings.Contains(strings.ToLower(jmsapi.Str(m["resource"])),
+					strings.ToLower(args.Resource)) {
+					return false
+				}
+				if args.Since != "" && !strings.HasPrefix(jmsapi.Str(m["datetime"]), args.Since[:min(len(args.Since), 13)]) {
+					return false
+				}
+				// keep counting the profile even past the limit: the profile
+				// covers every matched row, not just the ones shown.
+				types[rt]++
+				return true
 			},
-			Items: out,
-		}
+			Map: func(m map[string]any) jmsms.OperateLogSummary {
+				return jmsms.OperateLogSummary{
+					Datetime:     jmsapi.FieldStr(m["datetime"]),
+					User:         jmsapi.FieldStr(m["user"]),
+					Action:       jmsapi.FieldStr(jmsapi.Label(m, "action")),
+					ResourceType: jmsapi.FieldStr(jmsapi.Str(m["resource_type"])),
+					Resource:     jmsapi.FieldStr(m["resource"]),
+					RemoteAddr:   jmsapi.FieldStr(m["remote_addr"]),
+				}
+			},
+			Limit: args.Limit,
+			Def:   50,
+			Max:   500,
+		}.Build()
 		note := ""
-		if len(out) == 0 && len(rows) > 0 {
+		if res.Total == 0 && len(rows) > 0 {
 			note = "no row matched the filters; the bastion does hold " +
 				fmt.Sprintf("%d", len(rows)) + " operate-log rows in total"
 		}
-		if len(out) >= limit && len(rows) > len(out) {
-			note = "showing the first " + fmt.Sprintf("%d", limit) + " of " +
-				fmt.Sprintf("%d", len(rows)) + " rows; narrow with user/action/resource_type"
+		if res.Truncated {
+			note = "showing the first " + fmt.Sprintf("%d", res.Count) + " of " +
+				fmt.Sprintf("%d", res.Total) + " rows; narrow with user/action/resource_type"
 		}
 		if len(types) > 0 {
 			// The profile of the rows that matched is not a field of the list
@@ -148,41 +152,48 @@ func RegisterSecurityTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 500)
-		out := []jmsms.PasswordChangeSummary{}
-		suspicious := []string{}
-		for _, m := range rows {
-			user, changer := jmsapi.Str(m["user"]), jmsapi.Str(m["change_by"])
-			if args.User != "" && !strings.Contains(strings.ToLower(user), strings.ToLower(args.User)) {
-				continue
-			}
+		// The "was it the account itself" comparison, in one place for both
+		// the filter and the mapper.
+		selfChanged := func(user, changer string) bool {
 			// Strip the display suffix "(name)" before comparing: "ai(ai)" vs
 			// "Administrator(admin)" must not look like the same person.
-			selfChanged := strings.SplitN(user, "(", 2)[0] == strings.SplitN(changer, "(", 2)[0]
-			if !selfChanged {
-				suspicious = append(suspicious, fmt.Sprintf("%s reset by %s at %v from %v",
-					user, changer, m["datetime"], m["remote_addr"]))
-			}
-			if len(out) >= limit {
-				continue
-			}
-			out = append(out, jmsms.PasswordChangeSummary{
-				Datetime:    jmsapi.FieldStr(m["datetime"]),
-				User:        jmsapi.FieldStr(user),
-				ChangeBy:    jmsapi.FieldStr(changer),
-				RemoteAddr:  jmsapi.FieldStr(m["remote_addr"]),
-				SelfService: jms.OptBool(selfChanged),
-			})
+			return strings.SplitN(user, "(", 2)[0] == strings.SplitN(changer, "(", 2)[0]
 		}
-		res := render.ListOf[jmsms.PasswordChangeSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields. Two drifts this fixes, both of
+		// which misread the moment a filter was used: total used to be the
+		// UNFILTERED row count rather than how many matched, and truncated
+		// used to be true whenever a filter dropped anything.
+		suspicious := []string{}
+		res := render.ListSpec[map[string]any, jmsms.PasswordChangeSummary]{
+			Rows: rows,
+			Keep: func(m map[string]any) bool {
+				user, changer := jmsapi.Str(m["user"]), jmsapi.Str(m["change_by"])
+				if args.User != "" && !strings.Contains(strings.ToLower(user), strings.ToLower(args.User)) {
+					return false
+				}
+				if !selfChanged(user, changer) {
+					// keep counting the warning even past the limit: it
+					// covers every matched row, not just the ones shown.
+					suspicious = append(suspicious, fmt.Sprintf("%s reset by %s at %v from %v",
+						user, changer, m["datetime"], m["remote_addr"]))
+				}
+				return true
 			},
-			Items: out,
-		}
+			Map: func(m map[string]any) jmsms.PasswordChangeSummary {
+				user, changer := jmsapi.Str(m["user"]), jmsapi.Str(m["change_by"])
+				return jmsms.PasswordChangeSummary{
+					Datetime:    jmsapi.FieldStr(m["datetime"]),
+					User:        jmsapi.FieldStr(user),
+					ChangeBy:    jmsapi.FieldStr(changer),
+					RemoteAddr:  jmsapi.FieldStr(m["remote_addr"]),
+					SelfService: jms.OptBool(selfChanged(user, changer)),
+				}
+			},
+			Limit: args.Limit,
+			Def:   50,
+			Max:   500,
+		}.Build()
 		if len(suspicious) > 0 {
 			// The list envelope has no room for the list of resets that were
 			// not self-service, so it travels in the note -- the warning and
@@ -209,8 +220,6 @@ func RegisterSecurityTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 100, 1000)
 		names := []string{}
 		byID := map[string]map[string]any{}
 		for _, m := range rows {
@@ -220,30 +229,30 @@ func RegisterSecurityTools(r *reg.Registry, c *repository.Client) {
 		var id string
 		var role map[string]any
 		if args.Role == "" {
-			out := []jmsms.SystemRolePermissionRow{}
-			for _, m := range rows {
-				out = append(out, jmsms.SystemRolePermissionRow{
-					ID:          jmsapi.FieldStr(m["id"]),
-					Name:        jmsapi.FieldStr(m["name"]),
-					DisplayName: jmsapi.FieldStr(m["display_name"]),
-					Builtin:     jmsapi.FieldBool(m["builtin"]),
-					UsersAmount: jmsapi.FieldInt32(m["users_amount"]),
-					Comment:     jmsapi.FieldStr(m["comment"]),
-				})
-			}
-			return render.Text(render.ListOf[jmsms.SystemRolePermissionRow]{
-				ListMeta: jms.ListMeta{
-					Count:     int32(len(out)),
-					Total:     int32(len(rows)),
-					Truncated: false,
+			// filter → map → sort → truncate → count: render.ListSpec owns
+			// the counting. The roles list is complete by nature (a handful of
+			// system roles), so it carries no cap (Max 0): truncating it would
+			// drop rows the caller needs while reporting truncated for a list
+			// meant to be whole.
+			return render.Text(render.ListSpec[map[string]any, jmsms.SystemRolePermissionRow]{
+				Rows: rows,
+				Map: func(m map[string]any) jmsms.SystemRolePermissionRow {
+					return jmsms.SystemRolePermissionRow{
+						ID:          jmsapi.FieldStr(m["id"]),
+						Name:        jmsapi.FieldStr(m["name"]),
+						DisplayName: jmsapi.FieldStr(m["display_name"]),
+						Builtin:     jmsapi.FieldBool(m["builtin"]),
+						UsersAmount: jmsapi.FieldInt32(m["users_amount"]),
+						Comment:     jmsapi.FieldStr(m["comment"]),
+					}
 				},
-				Items: out,
+				Max: 0,
 				// Which mode this answer is: the rows are the ROLES, not
 				// what a role may do. Naming one switches the tool to the
 				// other mode, and the row type is the union of the two.
 				Note: "these rows are the system roles themselves; name one (role=SystemAdmin) " +
 					"to get what it may do",
-			})
+			}.Build())
 		}
 		if byID[args.Role] != nil {
 			id, role = args.Role, byID[args.Role]
@@ -268,7 +277,7 @@ func RegisterSecurityTools(r *reg.Registry, c *repository.Client) {
 				byP[t] = jmsapi.Str(m["pId"])
 			}
 		}
-		flat := []jmsms.SystemRolePermissionRow{}
+		paths := []string{}
 		for _, m := range tree {
 			t := jmsapi.Str(m["title"])
 			if t == "" {
@@ -287,32 +296,29 @@ func RegisterSecurityTools(r *reg.Registry, c *repository.Client) {
 			if path == "$ROOT$" {
 				continue
 			}
-			if args.Search != "" && !strings.Contains(strings.ToLower(path), strings.ToLower(args.Search)) {
-				continue
-			}
-			flat = append(flat, jmsms.SystemRolePermissionRow{Path: jms.Opt(path)})
+			paths = append(paths, path)
 		}
-		sort.Slice(flat, func(i, j int) bool {
-			return flat[i].GetPath() < flat[j].GetPath()
-		})
-		total := len(flat)
-		if len(flat) > limit {
-			flat = flat[:limit]
-		}
-		res := render.ListOf[jmsms.SystemRolePermissionRow]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(flat)),
-				Total:     int32(total),
-				Truncated: len(flat) < total,
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields.
+		res := render.ListSpec[string, jmsms.SystemRolePermissionRow]{
+			Rows: paths,
+			Keep: func(path string) bool {
+				return args.Search == "" || strings.Contains(strings.ToLower(path), strings.ToLower(args.Search))
 			},
-			Items: flat,
-			// Which role this is: the rows are the permissions, and the role's
-			// own fields travel in the note because the list envelope has no
-			// room for them.
-			Note: "these rows are what ONE system role may do; role: " + jmsapi.Str(role["name"]) +
-				" (" + jmsapi.Str(role["display_name"]) + "), users_amount: " +
-				fmt.Sprintf("%d", jmsapi.Int32(role["users_amount"])),
-		}
+			Map: func(path string) jmsms.SystemRolePermissionRow {
+				return jmsms.SystemRolePermissionRow{Path: jms.Opt(path)}
+			},
+			Less:  func(a, b jmsms.SystemRolePermissionRow) bool { return a.GetPath() < b.GetPath() },
+			Limit: args.Limit,
+			Def:   100,
+			Max:   1000,
+		}.Build()
+		// Which role this is: the rows are the permissions, and the role's
+		// own fields travel in the note because the list envelope has no
+		// room for them.
+		res.Note = "these rows are what ONE system role may do; role: " + jmsapi.Str(role["name"]) +
+			" (" + jmsapi.Str(role["display_name"]) + "), users_amount: " +
+			fmt.Sprintf("%d", jmsapi.Int32(role["users_amount"]))
 		return render.Text(res)
 	})
 

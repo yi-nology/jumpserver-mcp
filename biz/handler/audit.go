@@ -3,14 +3,12 @@ package handler
 import (
 	"context"
 	"net/url"
-	"sort"
 	"strings"
 
 	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/oekit/pkg/convert"
-	"github.com/oekit/pkg/slicex"
 	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
@@ -30,8 +28,6 @@ func RegisterAuditTools(r *reg.Registry, c *repository.Client) {
 		Description:  "List recent terminal sessions with user, asset, protocol, dates and whether a replay exists. Use it to find a session id for jms_session_transcript; jms_sessions_live is the other end of it (who is connected right now).",
 		OutputSchema: render.Schema[render.ListOf[jmsms.SessionSummary]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args sessionsArgs) (*mcp.CallToolResult, any, error) {
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 20, 100)
 		rows, err := c.List(ctx, jmsapi.ResSessions)
 		if err != nil {
 			return render.Err(err)
@@ -44,78 +40,71 @@ func RegisterAuditTools(r *reg.Registry, c *repository.Client) {
 			}
 			matcher = repository.NewAssetMatcher(ids, meta)
 		}
-		kept := slicex.Filter(rows, func(s map[string]any) bool {
-			if !matcher.Match(s) {
-				return false
-			}
-			if args.UserName != "" && !repository.UserMatches(convert.AnyToStr(s["user"]), args.UserName) {
-				return false
-			}
-			if args.SearchRef != "" {
-				q := strings.ToLower(args.SearchRef)
-				// The flat "name(address)" label carries both halves, so match
-				// against it whole rather than against a parsed field that this
-				// endpoint does not provide.
-				blob := strings.ToLower(convert.AnyToStr(s["asset"]) + " " + convert.AnyToStr(s["user"]) +
-					" " + convert.AnyToStr(s["account"]))
-				if !strings.Contains(blob, q) {
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields. Sorting before the cap is
+		// what keeps the NEWEST rows rather than whichever rows the endpoint
+		// returned first; total is how many matched the filters, before the
+		// cap.
+		return render.Text(render.ListSpec[map[string]any, jmsms.SessionSummary]{
+			Rows: rows,
+			Keep: func(s map[string]any) bool {
+				if !matcher.Match(s) {
 					return false
 				}
-			}
-			return true
-		})
-		out := slicex.Map(kept, func(s map[string]any) jmsms.SessionSummary {
-			// The replay size is a byte count, and the contract says i64.
-			var replaySize *int64
-			if v := s["replay_size"]; v != nil {
-				n := convert.AnyToInt64(v)
-				replaySize = &n
-			}
-			return jmsms.SessionSummary{
-				ID:            jmsapi.Str(s["id"]),
-				User:          jmsapi.FieldStr(s["user"]),
-				Asset:         jmsapi.FieldStr(jmsapi.AssetField(s, "name")),
-				Address:       jmsapi.FieldStr(jmsapi.AssetField(s, "address")),
-				AssetID:       jmsapi.FieldStr(jmsapi.AssetField(s, "id")),
-				Account:       jmsapi.FieldStr(s["account"]),
-				Protocol:      jmsapi.FieldStr(jmsapi.FieldName(s, "protocol")),
-				Type:          jmsapi.FieldStr(jmsapi.Label(s, "type")),
-				RemoteAddr:    jmsapi.FieldStr(s["remote_addr"]),
-				DateStart:     jmsapi.FieldStr(s["date_start"]),
-				DateEnd:       jmsapi.FieldStr(s["date_end"]),
-				Duration:      jmsapi.FieldStr(s["duration"]),
-				HasReplay:     jmsapi.FieldBool(s["has_replay"]),
-				CanReplay:     jmsapi.FieldBool(s["can_replay"]),
-				CommandAmount: jmsapi.FieldInt32(s["command_amount"]),
-				ErrorReason:   jmsapi.FieldStr(jmsapi.Label(s, "error_reason")),
-				IsSuccess:     jmsapi.FieldBool(s["is_success"]),
-				LoginFrom:     jmsapi.FieldStr(jmsapi.Label(s, "login_from")),
-				ReplaySize:    replaySize,
-			}
-		})
-		// Sort before capping, so the cap keeps the newest rows rather than
-		// whichever rows the endpoint happened to return first.
-		sort.SliceStable(out, func(i, j int) bool {
-			return out[i].GetDateStart() > out[j].GetDateStart()
-		})
-		// total is how many sessions matched the filters, before the cap.
-		total := len(kept)
-		if len(out) > limit {
-			out = out[:limit]
-		}
-		res := render.ListOf[jmsms.SessionSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(total),
-				Truncated: len(out) < total,
+				if args.UserName != "" && !repository.UserMatches(convert.AnyToStr(s["user"]), args.UserName) {
+					return false
+				}
+				if args.SearchRef != "" {
+					q := strings.ToLower(args.SearchRef)
+					// The flat "name(address)" label carries both halves, so match
+					// against it whole rather than against a parsed field that this
+					// endpoint does not provide.
+					blob := strings.ToLower(convert.AnyToStr(s["asset"]) + " " + convert.AnyToStr(s["user"]) +
+						" " + convert.AnyToStr(s["account"]))
+					if !strings.Contains(blob, q) {
+						return false
+					}
+				}
+				return true
 			},
-			Items: out,
+			Map: func(s map[string]any) jmsms.SessionSummary {
+				// The replay size is a byte count, and the contract says i64.
+				var replaySize *int64
+				if v := s["replay_size"]; v != nil {
+					n := convert.AnyToInt64(v)
+					replaySize = &n
+				}
+				return jmsms.SessionSummary{
+					ID:            jmsapi.Str(s["id"]),
+					User:          jmsapi.FieldStr(s["user"]),
+					Asset:         jmsapi.FieldStr(jmsapi.AssetField(s, "name")),
+					Address:       jmsapi.FieldStr(jmsapi.AssetField(s, "address")),
+					AssetID:       jmsapi.FieldStr(jmsapi.AssetField(s, "id")),
+					Account:       jmsapi.FieldStr(s["account"]),
+					Protocol:      jmsapi.FieldStr(jmsapi.FieldName(s, "protocol")),
+					Type:          jmsapi.FieldStr(jmsapi.Label(s, "type")),
+					RemoteAddr:    jmsapi.FieldStr(s["remote_addr"]),
+					DateStart:     jmsapi.FieldStr(s["date_start"]),
+					DateEnd:       jmsapi.FieldStr(s["date_end"]),
+					Duration:      jmsapi.FieldStr(s["duration"]),
+					HasReplay:     jmsapi.FieldBool(s["has_replay"]),
+					CanReplay:     jmsapi.FieldBool(s["can_replay"]),
+					CommandAmount: jmsapi.FieldInt32(s["command_amount"]),
+					ErrorReason:   jmsapi.FieldStr(jmsapi.Label(s, "error_reason")),
+					IsSuccess:     jmsapi.FieldBool(s["is_success"]),
+					LoginFrom:     jmsapi.FieldStr(jmsapi.Label(s, "login_from")),
+					ReplaySize:    replaySize,
+				}
+			},
+			Less:  func(a, b jmsms.SessionSummary) bool { return a.GetDateStart() > b.GetDateStart() },
+			Limit: args.Limit,
+			Def:   20,
+			Max:   100,
 			// has_command is false on every row this bastion returns even when
 			// command_amount is 5, so it must not be offered as the signal for
 			// "is there a transcript"; the count is the honest one.
 			Note: "use command_amount for the transcript size -- the bastion's has_command flag reads false on every session here",
-		}
-		return render.Text(res)
+		}.Build())
 	})
 
 	type commandsArgs struct {
@@ -129,8 +118,6 @@ func RegisterAuditTools(r *reg.Registry, c *repository.Client) {
 		Description:  "Search recorded session commands (the audit trail) and get EVERY match: the whole command log is read and filtered here, so a filter never silently truncates the trail. Filter by command text, asset or user. Rows carry the command but not its output -- use jms_command_audit when you need what came back.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.CommandSearchSummary]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args commandsArgs) (*mcp.CallToolResult, any, error) {
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 30, 200)
 		// The whole command log is read and filtered here. The endpoint caps a
 		// page at 200 rows and matches a user filter on one half of the
 		// "name(username)" display, so a server-side query both truncated the
@@ -147,55 +134,51 @@ func RegisterAuditTools(r *reg.Registry, c *repository.Client) {
 			}
 			matcher = repository.NewAssetMatcher(ids, meta)
 		}
-		out := []jmsms.CommandSearchSummary{}
-		for _, r := range recs {
-			if !matcher.MatchNameAddress(r.Asset, r.Address) {
-				continue
-			}
-			if args.UserName != "" && !repository.UserMatches(r.User, args.UserName) {
-				continue
-			}
-			if args.Search != "" {
-				q := strings.ToLower(args.Search)
-				blob := strings.ToLower(r.Input + " " + r.Output + " " + r.Asset + " " + r.User)
-				if !strings.Contains(blob, q) {
-					continue
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the counting.
+		res := render.ListSpec[repository.CommandRecord, jmsms.CommandSearchSummary]{
+			Rows: recs,
+			Keep: func(r repository.CommandRecord) bool {
+				if !matcher.MatchNameAddress(r.Asset, r.Address) {
+					return false
 				}
-			}
-			out = append(out, jmsms.CommandSearchSummary{
-				ID:         jms.Opt(r.ID),
-				User:       jms.Opt(r.User),
-				Asset:      jms.Opt(r.Asset),
-				Address:    jms.Opt(r.Address),
-				Account:    jms.Opt(r.Account),
-				Session:    jms.Opt(r.Session),
-				RemoteAddr: jms.Opt(r.RemoteAddr),
-				Input:      jms.Opt(jmsapi.Truncate(redactSecrets(r.Input), 500)),
-				RiskLevel:  jms.Opt(r.RiskLevel),
-				DateStart:  jms.Opt(r.When),
-			})
-		}
-		sort.SliceStable(out, func(i, j int) bool {
-			return out[i].GetDateStart() > out[j].GetDateStart()
-		})
-		total := len(out)
-		if len(out) > limit {
-			out = out[:limit]
-		}
-		res := render.ListOf[jmsms.CommandSearchSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(total),
-				Truncated: total > len(out),
+				if args.UserName != "" && !repository.UserMatches(r.User, args.UserName) {
+					return false
+				}
+				if args.Search != "" {
+					q := strings.ToLower(args.Search)
+					blob := strings.ToLower(r.Input + " " + r.Output + " " + r.Asset + " " + r.User)
+					if !strings.Contains(blob, q) {
+						return false
+					}
+				}
+				return true
 			},
-			Items: out,
-		}
+			Map: func(r repository.CommandRecord) jmsms.CommandSearchSummary {
+				return jmsms.CommandSearchSummary{
+					ID:         jms.Opt(r.ID),
+					User:       jms.Opt(r.User),
+					Asset:      jms.Opt(r.Asset),
+					Address:    jms.Opt(r.Address),
+					Account:    jms.Opt(r.Account),
+					Session:    jms.Opt(r.Session),
+					RemoteAddr: jms.Opt(r.RemoteAddr),
+					Input:      jms.Opt(jmsapi.Truncate(redactSecrets(r.Input), 500)),
+					RiskLevel:  jms.Opt(r.RiskLevel),
+					DateStart:  jms.Opt(r.When),
+				}
+			},
+			Less:  func(a, b jmsms.CommandSearchSummary) bool { return a.GetDateStart() > b.GetDateStart() },
+			Limit: args.Limit,
+			Def:   30,
+			Max:   200,
+		}.Build()
 		// count / total / truncated are always present, so a caller never has
 		// to guess whether a field exists: count is what came back, total is
 		// how many matched, truncated says whether the list was cut.
-		if total > len(out) {
-			res.Note = "showing the newest " + convert.AnyToStr(len(out)) + " of " +
-				convert.AnyToStr(total) + " matching commands"
+		if res.Truncated {
+			res.Note = "showing the newest " + convert.AnyToStr(res.Count) + " of " +
+				convert.AnyToStr(res.Total) + " matching commands"
 		}
 		return render.Text(res)
 	})
@@ -210,8 +193,6 @@ func RegisterAuditTools(r *reg.Registry, c *repository.Client) {
 		Description:  "Query authentication logs: who logged in, from where, and failed attempts. Use to spot brute-force or stale sessions.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.LoginLogSummary]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args loginArgs) (*mcp.CallToolResult, any, error) {
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 30, 200)
 		q := url.Values{"ordering": {"-date_created"}}
 		if args.UserName != "" {
 			q.Set("username", args.UserName)
@@ -227,36 +208,32 @@ func RegisterAuditTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Err(err)
 		}
-		total := len(rows)
-		// /audits/login-logs/ names its fields ip / datetime and carries
-		// backend as a plain string, unlike /audits/operate-logs/ which
-		// uses remote_addr / datetime and a labelled object. Reading the
-		// login log under the operate-log names silently yields nulls.
-		out := make([]jmsms.LoginLogSummary, 0, len(rows))
-		for _, l := range rows {
-			out = append(out, jmsms.LoginLogSummary{
-				Username:    jms.Opt(convert.AnyToStr(l["username"])),
-				Success:     jms.OptBool(jmsapi.Label(l, "status") == "success"),
-				Backend:     jms.Opt(jmsapi.FieldName(l, "backend")),
-				RemoteAddr:  jms.Opt(convert.AnyToStr(l["ip"])),
-				UserAgent:   jms.Opt(jmsapi.Truncate(convert.AnyToStr(l["user_agent"]), 120)),
-				DateCreated: jms.Opt(convert.AnyToStr(l["datetime"])),
-			})
-		}
-		if len(out) > limit {
-			out = out[:limit]
-		}
-		res := render.ListOf[jmsms.LoginLogSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(total),
-				Truncated: total > len(out),
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// counting. Less is nil: the server answers in -date_created order
+		// and that order is the answer.
+		res := render.ListSpec[map[string]any, jmsms.LoginLogSummary]{
+			Rows: rows,
+			Map: func(l map[string]any) jmsms.LoginLogSummary {
+				// /audits/login-logs/ names its fields ip / datetime and carries
+				// backend as a plain string, unlike /audits/operate-logs/ which
+				// uses remote_addr / datetime and a labelled object. Reading the
+				// login log under the operate-log names silently yields nulls.
+				return jmsms.LoginLogSummary{
+					Username:    jms.Opt(convert.AnyToStr(l["username"])),
+					Success:     jms.OptBool(jmsapi.Label(l, "status") == "success"),
+					Backend:     jms.Opt(jmsapi.FieldName(l, "backend")),
+					RemoteAddr:  jms.Opt(convert.AnyToStr(l["ip"])),
+					UserAgent:   jms.Opt(jmsapi.Truncate(convert.AnyToStr(l["user_agent"]), 120)),
+					DateCreated: jms.Opt(convert.AnyToStr(l["datetime"])),
+				}
 			},
-			Items: out,
-		}
-		if total > len(out) {
-			res.Note = "showing the first " + convert.AnyToStr(len(out)) + " of " +
-				convert.AnyToStr(total) + " login rows; narrow with user or success"
+			Limit: args.Limit,
+			Def:   30,
+			Max:   200,
+		}.Build()
+		if res.Truncated {
+			res.Note = "showing the first " + convert.AnyToStr(res.Count) + " of " +
+				convert.AnyToStr(res.Total) + " login rows; narrow with user or success"
 		}
 		return render.Text(res)
 	})

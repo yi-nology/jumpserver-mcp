@@ -59,41 +59,37 @@ func RegisterUserTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 200)
-		out := []jmsms.UserSummary{}
-		matched := 0
-		for _, u := range rows {
-			username := jmsapi.Str(u["username"])
-			if args.Search != "" && !strings.Contains(strings.ToLower(username), strings.ToLower(args.Search)) {
-				continue
-			}
-			matched++
-			if len(out) >= limit {
-				continue
-			}
-			out = append(out, jmsms.UserSummary{
-				Username:     username,
-				ID:           jmsapi.FieldStr(u["id"]),
-				Name:         jmsapi.FieldStr(u["name"]),
-				IsSuperuser:  jmsapi.FieldBool(u["is_superuser"]),
-				IsActive:     jmsapi.FieldBool(u["is_active"]),
-				HasPublicKey: jmsapi.FieldBool(u["has_public_keys"]),
-				LastLogin:    jmsapi.FieldStr(u["last_login"]),
-			})
-		}
-		sort.Slice(out, func(i, j int) bool {
-			return out[i].Username < out[j].Username
-		})
-		res := render.ListOf[jmsms.UserSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(matched),
-				Truncated: len(out) < matched,
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields. This replaces a loop that
+		// capped BEFORE sorting — so limit=50 returned "the first 50 in the
+		// endpoint's order, then sorted", not "the 50 lowest usernames" —
+		// and computed the totals by hand. Sorting before the cap is what
+		// makes limit mean "the top N by the sort key".
+		return render.Text(render.ListSpec[map[string]any, jmsms.UserSummary]{
+			Rows: rows,
+			Keep: func(u map[string]any) bool {
+				if args.Search == "" {
+					return true
+				}
+				username := jmsapi.Str(u["username"])
+				return strings.Contains(strings.ToLower(username), strings.ToLower(args.Search))
 			},
-			Items: out,
-		}
-		return render.Text(res)
+			Map: func(u map[string]any) jmsms.UserSummary {
+				return jmsms.UserSummary{
+					Username:     jmsapi.Str(u["username"]),
+					ID:           jmsapi.FieldStr(u["id"]),
+					Name:         jmsapi.FieldStr(u["name"]),
+					IsSuperuser:  jmsapi.FieldBool(u["is_superuser"]),
+					IsActive:     jmsapi.FieldBool(u["is_active"]),
+					HasPublicKey: jmsapi.FieldBool(u["has_public_keys"]),
+					LastLogin:    jmsapi.FieldStr(u["last_login"]),
+				}
+			},
+			Less:  func(a, b jmsms.UserSummary) bool { return a.Username < b.Username },
+			Limit: args.Limit,
+			Def:   50,
+			Max:   200,
+		}.Build())
 	})
 
 	type sshkeyAddArgs struct {
@@ -1058,47 +1054,44 @@ func RegisterOpsTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 30, 100)
-		out := []jmsms.SessionSummary{}
-		matched := 0
-		for _, s := range rows {
-			// The endpoint has no user_display / asset_display fields; the
-			// user and asset keys carry the "name(address)" label directly.
-			// Filtering on is_finished is what makes this "live": the listing
-			// endpoint returns the whole history, finished sessions included.
-			if fin, ok := s["is_finished"].(bool); ok && fin {
-				continue
-			}
-			matched++
-			if len(out) >= limit {
-				continue
-			}
-			out = append(out, jmsms.SessionSummary{
-				ID:         jmsapi.Str(s["id"]),
-				User:       jmsapi.FieldStr(s["user"]),
-				Asset:      jmsapi.FieldStr(jmsapi.AssetField(s, "name")),
-				Address:    jmsapi.FieldStr(jmsapi.AssetField(s, "address")),
-				Account:    jmsapi.FieldStr(s["account"]),
-				Protocol:   jmsapi.FieldStr(jmsapi.FieldName(s, "protocol")),
-				Type:       jmsapi.FieldStr(jmsapi.Label(s, "type")),
-				RemoteAddr: jmsapi.FieldStr(s["remote_addr"]),
-				DateStart:  jmsapi.FieldStr(s["date_start"]),
-				IsFinished: jmsapi.FieldBool(s["is_finished"]),
-			})
-		}
-		sort.Slice(out, func(i, j int) bool {
-			return out[i].GetDateStart() > out[j].GetDateStart()
-		})
-		res := render.ListOf[jmsms.SessionSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(matched),
-				Truncated: len(out) < matched,
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields. Sorting before the cap is
+		// what keeps the NEWEST live sessions rather than whichever rows the
+		// endpoint returned first -- the old loop capped before it sorted, so
+		// limit=N answered "N rows in the endpoint's order, sorted among
+		// themselves". total is how many live sessions matched, before the
+		// cap.
+		return render.Text(render.ListSpec[map[string]any, jmsms.SessionSummary]{
+			Rows: rows,
+			Keep: func(s map[string]any) bool {
+				// The endpoint has no user_display / asset_display fields; the
+				// user and asset keys carry the "name(address)" label directly.
+				// Filtering on is_finished is what makes this "live": the listing
+				// endpoint returns the whole history, finished sessions included.
+				if fin, ok := s["is_finished"].(bool); ok && fin {
+					return false
+				}
+				return true
 			},
-			Items: out,
-		}
-		return render.Text(res)
+			Map: func(s map[string]any) jmsms.SessionSummary {
+				return jmsms.SessionSummary{
+					ID:         jmsapi.Str(s["id"]),
+					User:       jmsapi.FieldStr(s["user"]),
+					Asset:      jmsapi.FieldStr(jmsapi.AssetField(s, "name")),
+					Address:    jmsapi.FieldStr(jmsapi.AssetField(s, "address")),
+					Account:    jmsapi.FieldStr(s["account"]),
+					Protocol:   jmsapi.FieldStr(jmsapi.FieldName(s, "protocol")),
+					Type:       jmsapi.FieldStr(jmsapi.Label(s, "type")),
+					RemoteAddr: jmsapi.FieldStr(s["remote_addr"]),
+					DateStart:  jmsapi.FieldStr(s["date_start"]),
+					IsFinished: jmsapi.FieldBool(s["is_finished"]),
+				}
+			},
+			Less:  func(a, b jmsms.SessionSummary) bool { return a.GetDateStart() > b.GetDateStart() },
+			Limit: args.Limit,
+			Def:   30,
+			Max:   100,
+		}.Build())
 	})
 }
 

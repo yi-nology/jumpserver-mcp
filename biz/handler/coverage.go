@@ -167,49 +167,62 @@ func RegisterCoverageTools(r *reg.Registry, c *repository.Client) {
 		}
 		sort.Strings(heldBy[""])
 
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 200)
-		out := []jmsms.AccessMatrixUser{}
+		// The per-user reach has to be read for EVERY candidate user before
+		// the cap: the answer is sorted by reach, and "the top N by reach"
+		// cannot be decided from the first N users the endpoint happened to
+		// return. The old loop capped first and sorted afterwards, so
+		// limit=N answered "N users in the endpoint's order, sorted among
+		// themselves" -- and reported that count as the total, with
+		// truncated stuck at false.
+		reach := map[string][]map[string]any{}
 		for _, u := range users {
 			username := jmsapi.Str(u["username"])
 			// Component accounts such as [KoKo]-... are internal plumbing.
 			if strings.HasPrefix(username, "[") {
 				continue
 			}
-			if len(out) >= limit {
-				break
-			}
 			uid := jmsapi.Str(u["id"])
 			rows, err := c.ListSub(ctx, jmsapi.ResPermUserAssets, uid, "assets")
 			if err != nil {
 				continue
 			}
-			byPlatform := map[string]int32{}
-			for _, a := range rows {
-				byPlatform[jmsapi.Str(jmsapi.Nested(a, "platform", "name"))]++
-			}
-			out = append(out, jmsms.AccessMatrixUser{
-				Username:        username,
-				IsActive:        jmsapi.FieldBool(u["is_active"]),
-				IsSuperuser:     jmsapi.FieldBool(u["is_superuser"]),
-				AssetsReachable: jms.OptInt32(int32(len(rows))),
-				ByPlatform:      byPlatform,
-				Permissions:     heldBy[uid],
-			})
+			reach[uid] = rows
 		}
-		sort.Slice(out, func(i, j int) bool {
-			return out[i].GetAssetsReachable() > out[j].GetAssetsReachable()
-		})
-		res := render.ListOf[jmsms.AccessMatrixUser]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(out)),
-				Truncated: false,
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields; total is how many users the
+		// matrix resolved, before the cap.
+		return render.Text(render.ListSpec[map[string]any, jmsms.AccessMatrixUser]{
+			Rows: users,
+			Keep: func(u map[string]any) bool {
+				// Component accounts such as [KoKo]-... are internal plumbing.
+				if strings.HasPrefix(jmsapi.Str(u["username"]), "[") {
+					return false
+				}
+				_, ok := reach[jmsapi.Str(u["id"])]
+				return ok
 			},
-			Items: out,
+			Map: func(u map[string]any) jmsms.AccessMatrixUser {
+				uid := jmsapi.Str(u["id"])
+				rows := reach[uid]
+				byPlatform := map[string]int32{}
+				for _, a := range rows {
+					byPlatform[jmsapi.Str(jmsapi.Nested(a, "platform", "name"))]++
+				}
+				return jmsms.AccessMatrixUser{
+					Username:        jmsapi.Str(u["username"]),
+					IsActive:        jmsapi.FieldBool(u["is_active"]),
+					IsSuperuser:     jmsapi.FieldBool(u["is_superuser"]),
+					AssetsReachable: jms.OptInt32(int32(len(rows))),
+					ByPlatform:      byPlatform,
+					Permissions:     heldBy[uid],
+				}
+			},
+			Less:  func(a, b jmsms.AccessMatrixUser) bool { return a.GetAssetsReachable() > b.GetAssetsReachable() },
+			Limit: args.Limit,
+			Def:   50,
+			Max:   200,
 			Note:  "sorted by reach, widest first; this is the view to start an access review from",
-		}
-		return render.Text(res)
+		}.Build())
 	})
 }
 

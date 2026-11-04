@@ -11,6 +11,35 @@
 
 ### 修复
 
+## [0.7.0] - 2026-11-04
+
+### 变更
+
+- **列表样板收编到底座 `render.ListSpec`**（本仓 35 处全量）：列表信封的形状只有一份
+  （filter → map → sort → truncate → count，`total` = 匹配数，截断才报 `truncated`）。
+- **演练判定与措辞收编到 `risk.Rehearsal`**（两个面唯一源）。
+- **入口层收编**：`cmd/serve/http.go` 删除，serve 生命周期（listen / 后台 serve / 信号 /
+  5s 优雅关闭）交给底座 `httpapi.Run`；`cmd/tools` 的表格循环交给 `reg.CatalogueTable`；
+  `openapi_test.go` 缩为一次 `testsupport.CheckOpenAPI`（守卫身两仓一份）。
+- **日志措辞统一到共用生命周期**（行为变化）：stdio 失败行 `FATAL  server failed: …` →
+  `FATAL  serve: …`；`serve http` 缺地址的提示改为
+  `serve http needs an address to listen on — JMS_HTTP_ADDR, …`；HTTP 面后台失败行不再
+  带服务前缀（`http: …`）。
+- **底座升 `jumpserver-kit` v0.4.0**。
+- **工具计数单源**：`policy_test` 的两处硬编码 97 并为一个 `wantTools` 常量
+  （文件头注释里过时的「76」一并消掉——三处数字就是三个漂移点）。
+
+### 修复
+
+- **列表的顺序 / 计数漂移修正**（收编时暴露；九处：`jms_users_list`、`jms_sessions_live`、
+  `jms_job_list`、`jms_accounts_list`、`jms_filter_list`、`jms_filter_preview`、
+  `jms_scope_user_groups`、`jms_operate_logs`、`jms_password_change_logs`）：
+  - **先截断后排序** ⇒ 先排序后截断（`jms_users_list`、`jms_sessions_live`）：limit 的语义
+    从「随便 N 个再排序」修正为「按排序键的前 N」。
+  - **`total` 语义** ⇒ 一律 = 匹配数（上述站点原先多处报**未过滤**行数、或在过滤前自增）。
+  - **`truncated`** ⇒ 只在真截断时为真（上述站点原先多处把「被过滤掉」也算成「被截断」）。
+  （`jms_role_permissions` 等其余站点是收编**等价**，旧口径本就正确，不在修正之列。）
+
 ## [0.6.0] - 2026-11-04
 
 ### 变更

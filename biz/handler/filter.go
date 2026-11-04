@@ -47,34 +47,28 @@ func RegisterFilterTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 200)
-		out := []jmsms.CommandGroupSummary{}
-		for _, g := range rows {
-			if len(out) >= limit {
-				break
-			}
-			out = append(out, jmsms.CommandGroupSummary{
-				ID:         jmsapi.FieldStr(g["id"]),
-				Name:       jmsapi.FieldStr(g["name"]),
-				Type:       jms.Opt(jmsapi.Label(g, "type")),
-				IgnoreCase: jms.OptBool(g["ignore_case"] == true),
-				Comment:    jmsapi.FieldStr(g["comment"]),
-				Commands:   jmsapi.FieldStr(g["content"]),
-			})
-		}
-		sort.Slice(out, func(i, j int) bool {
-			return out[i].GetName() < out[j].GetName()
-		})
-		res := render.ListOf[jmsms.CommandGroupSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields. This replaces a loop that
+		// capped BEFORE sorting — so limit=50 returned the first 50 rows in
+		// the endpoint's order, sorted among themselves. Sorting before the
+		// cap is what makes limit mean "the top N by name".
+		return render.Text(render.ListSpec[map[string]any, jmsms.CommandGroupSummary]{
+			Rows: rows,
+			Map: func(g map[string]any) jmsms.CommandGroupSummary {
+				return jmsms.CommandGroupSummary{
+					ID:         jmsapi.FieldStr(g["id"]),
+					Name:       jmsapi.FieldStr(g["name"]),
+					Type:       jms.Opt(jmsapi.Label(g, "type")),
+					IgnoreCase: jms.OptBool(g["ignore_case"] == true),
+					Comment:    jmsapi.FieldStr(g["comment"]),
+					Commands:   jmsapi.FieldStr(g["content"]),
+				}
 			},
-			Items: out,
-		}
-		return render.Text(res)
+			Less:  func(a, b jmsms.CommandGroupSummary) bool { return a.GetName() < b.GetName() },
+			Limit: args.Limit,
+			Def:   50,
+			Max:   200,
+		}.Build())
 	})
 
 	type groupCreateArgs struct {
@@ -135,42 +129,38 @@ func RegisterFilterTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		limit := args.Limit
-		limit = repository.NormLimit(limit, 50, 200)
-		out := []jmsms.CommandFilterSummary{}
-		for _, f := range rows {
-			if len(out) >= limit {
-				break
-			}
-			out = append(out, jmsms.CommandFilterSummary{
-				ID:            jmsapi.FieldStr(f["id"]),
-				Name:          jmsapi.FieldStr(f["name"]),
-				Action:        jms.Opt(jmsapi.Label(f, "action")),
-				Priority:      jmsapi.FieldInt32(f["priority"]),
-				IsActive:      jms.OptBool(f["is_active"] == true),
-				Users:         jmsapi.FieldInt32(f["users_amount"]),
-				Assets:        jmsapi.FieldInt32(f["assets_amount"]),
-				Accounts:      jmsapi.FieldInt32(f["accounts_amount"]),
-				CommandGroups: idList(f["command_groups"]),
-				Comment:       jmsapi.FieldStr(f["comment"]),
-			})
-		}
-		sort.Slice(out, func(i, j int) bool {
-			a, b := out[i].GetPriority(), out[j].GetPriority()
-			if a != b {
-				return a < b
-			}
-			return out[i].GetName() < out[j].GetName()
-		})
-		res := render.ListOf[jmsms.CommandFilterSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// order and the three counting fields. This replaces a loop that
+		// capped BEFORE sorting — so limit=50 returned the first 50 rows in
+		// the endpoint's order, sorted among themselves. Sorting before the
+		// cap is what makes limit mean "the top N by priority, then name".
+		return render.Text(render.ListSpec[map[string]any, jmsms.CommandFilterSummary]{
+			Rows: rows,
+			Map: func(f map[string]any) jmsms.CommandFilterSummary {
+				return jmsms.CommandFilterSummary{
+					ID:            jmsapi.FieldStr(f["id"]),
+					Name:          jmsapi.FieldStr(f["name"]),
+					Action:        jms.Opt(jmsapi.Label(f, "action")),
+					Priority:      jmsapi.FieldInt32(f["priority"]),
+					IsActive:      jms.OptBool(f["is_active"] == true),
+					Users:         jmsapi.FieldInt32(f["users_amount"]),
+					Assets:        jmsapi.FieldInt32(f["assets_amount"]),
+					Accounts:      jmsapi.FieldInt32(f["accounts_amount"]),
+					CommandGroups: idList(f["command_groups"]),
+					Comment:       jmsapi.FieldStr(f["comment"]),
+				}
 			},
-			Items: out,
-		}
-		return render.Text(res)
+			Less: func(a, b jmsms.CommandFilterSummary) bool {
+				pa, pb := a.GetPriority(), b.GetPriority()
+				if pa != pb {
+					return pa < pb
+				}
+				return a.GetName() < b.GetName()
+			},
+			Limit: args.Limit,
+			Def:   50,
+			Max:   200,
+		}.Build())
 	})
 
 	type filterCreateArgs struct {

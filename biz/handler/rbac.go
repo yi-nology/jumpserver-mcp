@@ -39,7 +39,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/oekit/pkg/slicex"
-	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 	"github.com/yi-nology/jumpserver-kit/pkg/render"
@@ -70,8 +69,6 @@ func RegisterRBACTools(r *reg.Registry, c *repository.Client) {
 		if scope != "org" && scope != "system" {
 			return render.Failf("scope must be org or system, got %q", args.Scope)
 		}
-		limit := repository.NormLimit(args.Limit, 100, 1000)
-
 		// The catalogue is read whole and narrowed HERE. The endpoint does
 		// declare a codename filter, but it is an EXACT match while an agent
 		// naturally greps a substring -- and an exact filter that matches
@@ -86,52 +83,54 @@ func RegisterRBACTools(r *reg.Registry, c *repository.Client) {
 
 		needle := strings.ToLower(strings.TrimSpace(args.Search))
 		codename := strings.ToLower(strings.TrimSpace(args.Codename))
-		out := []jmsms.RBACPermission{}
-		matched := 0
-		for _, m := range rows {
-			item := jmsms.RBACPermission{
-				ID:   jmsapi.FieldStr(m["id"]),
-				Name: jmsapi.FieldStr(m["name"]),
-				// content_type is a nested object
-				// {"id":30,"app_label":"accounts","model":"account"} --
-				// reading it as a flat field would yield "" and an entry
-				// that says "some capability somewhere".
-				AppLabel: jmsapi.FieldStr(jmsapi.Nested(m, "content_type", "app_label")),
-				Model:    jmsapi.FieldStr(jmsapi.Nested(m, "content_type", "model")),
-			}
-			cn := jmsapi.Str(m["codename"])
-			item.Codename = jmsapi.FieldStr(cn)
-
-			if codename != "" && strings.ToLower(cn) != codename {
-				continue
-			}
-			if needle != "" {
-				hay := strings.ToLower(cn + " " + jmsapi.Str(m["name"]) + " " +
-					jmsapi.Str(item.AppLabel) + " " + jmsapi.Str(item.Model))
-				if !strings.Contains(hay, needle) {
-					continue
+		// filter → map → sort → truncate → count: render.ListSpec owns the
+		// counting. Less stays nil: the catalogue answers in its own order
+		// and this list never sorted locally.
+		res := render.ListSpec[map[string]any, jmsms.RBACPermission]{
+			Rows: rows,
+			Keep: func(m map[string]any) bool {
+				cn := jmsapi.Str(m["codename"])
+				if codename != "" && strings.ToLower(cn) != codename {
+					return false
 				}
-			}
-			matched++
-			if len(out) < limit {
-				out = append(out, item)
-			}
-		}
-		note := ""
-		if matched == 0 {
-			note = "no permission matched; the catalogue holds " + strconv.Itoa(serverTotal) + " rows in " + scope + " scope"
-		} else if len(out) < matched {
-			note = "showing " + strconv.Itoa(len(out)) + " of " + strconv.Itoa(matched) + " matches; raise limit to see the rest"
-		}
-		res := render.ListOf[jmsms.RBACPermission]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(matched),
-				Truncated: len(out) < matched,
+				if needle != "" {
+					// The same fields the mapped row carries (AppLabel/Model
+					// read through the nested content_type).
+					hay := strings.ToLower(cn + " " + jmsapi.Str(m["name"]) + " " +
+						jmsapi.Str(jmsapi.FieldStr(jmsapi.Nested(m, "content_type", "app_label"))) + " " +
+						jmsapi.Str(jmsapi.FieldStr(jmsapi.Nested(m, "content_type", "model"))))
+					if !strings.Contains(hay, needle) {
+						return false
+					}
+				}
+				return true
 			},
-			Items: out,
-			Note:  note,
+			Map: func(m map[string]any) jmsms.RBACPermission {
+				item := jmsms.RBACPermission{
+					ID:   jmsapi.FieldStr(m["id"]),
+					Name: jmsapi.FieldStr(m["name"]),
+					// content_type is a nested object
+					// {"id":30,"app_label":"accounts","model":"account"} --
+					// reading it as a flat field would yield "" and an entry
+					// that says "some capability somewhere".
+					AppLabel: jmsapi.FieldStr(jmsapi.Nested(m, "content_type", "app_label")),
+					Model:    jmsapi.FieldStr(jmsapi.Nested(m, "content_type", "model")),
+				}
+				cn := jmsapi.Str(m["codename"])
+				item.Codename = jmsapi.FieldStr(cn)
+				return item
+			},
+			Limit: args.Limit,
+			Def:   100,
+			Max:   1000,
+		}.Build()
+		note := ""
+		if res.Total == 0 {
+			note = "no permission matched; the catalogue holds " + strconv.Itoa(serverTotal) + " rows in " + scope + " scope"
+		} else if res.Truncated {
+			note = "showing " + strconv.Itoa(int(res.Count)) + " of " + strconv.Itoa(int(res.Total)) + " matches; raise limit to see the rest"
 		}
+		res.Note = note
 		return render.Text(res)
 	})
 
