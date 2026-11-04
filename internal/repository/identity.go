@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/oekit/pkg/convert"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 func (c *Client) UserIDByName(ctx context.Context, username string) (string, error) {

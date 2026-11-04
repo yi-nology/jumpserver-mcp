@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
 // fakeBastionWithTransfers serves the file transfer trail.

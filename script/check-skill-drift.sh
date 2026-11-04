@@ -23,7 +23,7 @@
 #     JMS_SIBLING_ROOTS=/path/to/kit:/path/to/exec ./script/check-skill-drift.sh
 #
 # 没有 JMS_SIBLING_ROOTS 时用同级目录约定（三个仓并排放着）：
-#     ../jumpserver-mcp-kit  ../jumpserver-mcp  ../jumpserver-mcp-exec
+#     ../jumpserver-kit  ../jumpserver-mgmt  ../jumpserver-exec
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,7 +32,7 @@ PARENT="$(cd "$ROOT/.." && pwd)"
 
 # 多仓工作集：环境变量优先（`:` 分隔），否则用同级目录约定。
 # ⚠️ 三个仓的名字是**约定**（和守卫用的是同一套）—— 一份拷贝会漂。
-# ⚠️ **另一份在底座仓**：`jumpserver-mcp-kit/script/workset.py` 的
+# ⚠️ **另一份在底座仓**：`jumpserver-kit/script/workset.py` 的
 # `REPO_NAMES`（两个变异脚本读它）。改了这份名单 ⇒ 那边也要改。
 roots() {
   local d
@@ -40,7 +40,7 @@ roots() {
     echo "$JMS_SIBLING_ROOTS" | tr ':' '\n'
     return
   fi
-  for d in jumpserver-mcp-kit jumpserver-mcp jumpserver-mcp-exec; do
+  for d in jumpserver-kit jumpserver-mgmt jumpserver-exec; do
     [ -d "$PARENT/$d" ] && echo "$PARENT/$d"
   done
 }

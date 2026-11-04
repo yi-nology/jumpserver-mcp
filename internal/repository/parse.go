@@ -16,7 +16,7 @@ import (
 	"github.com/oekit/pkg/convert"
 	"github.com/oekit/pkg/pagination"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // AssetMatcher matches a row against a set of assets the caller named.

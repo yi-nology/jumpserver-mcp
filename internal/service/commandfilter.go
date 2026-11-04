@@ -33,7 +33,7 @@ import (
 
 	"github.com/oekit/pkg/convert"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // MatchCommandGroup reports whether a command group matches an input line.

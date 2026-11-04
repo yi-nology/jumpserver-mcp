@@ -20,8 +20,8 @@ package repository
 import (
 	"net/http"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp/internal/config"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-mgmt/internal/config"
 )
 
 // Client is the management plane's view of the bastion.
@@ -46,7 +46,7 @@ type Client struct {
 // New builds a client from the configuration.
 //
 // The credential is not required here: the client is also built for the
-// commands that only need the catalogue (jumpserver-mcp tools) and for the
+// commands that only need the catalogue (jumpserver-mgmt tools) and for the
 // tests. What a missing credential breaks is the API calls, not the
 // construction.
 func New(cfg *config.Config) (*Client, error) {

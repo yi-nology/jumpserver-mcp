@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 // TestFilterBodyWireFormat sends the exact body the tool builds and prints the

@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/oekit/pkg/convert"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // ResolveAssets finds the assets the references name.

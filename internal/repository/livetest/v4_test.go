@@ -36,9 +36,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/errs"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-kit/pkg/errs"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 // v4Client returns a client for the v4 bastion under test, or skips.

@@ -17,7 +17,7 @@ package jmsms
 import (
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/contractscan"
+	"github.com/yi-nology/jumpserver-kit/pkg/contractscan"
 )
 
 func TestEveryContractTypeIsProduced(t *testing.T) {

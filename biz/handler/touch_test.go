@@ -11,13 +11,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
-	"github.com/yi-nology/jumpserver-mcp/internal/service/policy"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
+	"github.com/yi-nology/jumpserver-mgmt/internal/service/policy"
 )
 
 // The bastion serves two different shapes for the same concept. The asset,

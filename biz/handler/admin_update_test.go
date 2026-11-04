@@ -25,7 +25,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
 // assetReq is one request the fake bastion saw, for wire assertions.

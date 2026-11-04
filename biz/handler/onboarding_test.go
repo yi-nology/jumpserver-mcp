@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository/livetest"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository/livetest"
 )
 
 // diagCheck is the shape the diagnostic contract puts on the wire.

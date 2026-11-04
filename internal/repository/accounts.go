@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/oekit/pkg/convert"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // AccountID finds the id of the account with this username on an asset.

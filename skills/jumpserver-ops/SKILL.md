@@ -142,8 +142,8 @@ jms_job_stop          {"task_id":"...","confirm":true}      # 停掉跑飞的批
 **不确定哪里断了 → 先自检**：
 
 ```bash
-jumpserver-mcp --doctor    # 管理面：接线 + 堡垒机配置体检
-jumpserver-mcp-exec --doctor      # 执行面：接线 + 真实 koko 登录验证
+jumpserver-mgmt --doctor    # 管理面：接线 + 堡垒机配置体检
+jumpserver-exec --doctor      # 执行面：接线 + 真实 koko 登录验证
 ```
 
 `doctor` 也是子命令形态（两种等价）；`--help` 打印用法。
@@ -191,7 +191,7 @@ jumpserver-mcp-exec --doctor      # 执行面：接线 + 真实 koko 登录验�
 |---|---|
 | [`references/v5-api-traps.md`](references/v5-api-traps.md) | **v5 的 API 坑表**（20 条，全部实测）。写操作前先看 |
 | [`references/version-compat.md`](references/version-compat.md) | **v4 与 v5 的差异**（⚠️ 源码级核对，**未实测**）。面对 v4 堡垒机、或不确定某个行为是不是版本差异时看 |
-| [koko TUI 协议](https://github.com/yi-nology/jumpserver-mcp-exec/blob/main/skills/jms-exec-ops/references/koko-tui.md) | koko TUI 协议。改握手前先看（**在执行面仓里**） |
+| [koko TUI 协议](https://github.com/yi-nology/jumpserver-exec/blob/main/skills/jms-exec-ops/references/koko-tui.md) | koko TUI 协议。改握手前先看（**在执行面仓里**） |
 | `docs/CONFIGURATION.md` | 环境变量、接线、资产上线流程、故障对照表（仓库内） |
 
 ---
@@ -199,7 +199,7 @@ jumpserver-mcp-exec --doctor      # 执行面：接线 + 真实 koko 登录验�
 ## 6. 改了 MCP 之后怎么验证
 
 ```bash
-cd /path/to/jumpserver-mcp
+cd /path/to/jumpserver-mgmt
 ./script/build-mcp.sh      # 编译 + 单测 + 启动自检（测试失败会打印日志）
 ./script/publish-mcp.py    # 挑最新可用构建，打印 mcp update 命令
 # 按输出 mcp update，然后重启会话

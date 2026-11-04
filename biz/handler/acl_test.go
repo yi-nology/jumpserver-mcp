@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
 // Real POST/GET bytes from the v5 machine, one per family.

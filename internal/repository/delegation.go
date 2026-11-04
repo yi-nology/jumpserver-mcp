@@ -44,7 +44,7 @@ package repository
 import (
 	"context"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 const (

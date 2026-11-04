@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/render"
-	"github.com/yi-nology/jumpserver-mcp/biz/model/jmsms"
+	"github.com/yi-nology/jumpserver-kit/pkg/render"
+	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
 )
 
 // The refusal of an answer has to be FINDABLE.

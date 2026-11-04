@@ -116,7 +116,7 @@ displayNames:
 ## 4. 体检：一次扫出配置里的雷
 
 ```bash
-jumpserver-mcp --doctor     # 或会话内 jms_doctor
+jumpserver-mgmt --doctor     # 或会话内 jms_doctor
 ```
 
 会报出：

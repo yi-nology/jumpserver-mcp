@@ -7,15 +7,15 @@ import (
 	"testing"
 
 	"github.com/oekit/pkg/slicex"
-	"github.com/yi-nology/jumpserver-mcp/internal/service"
+	"github.com/yi-nology/jumpserver-mgmt/internal/service"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository/livetest"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository/livetest"
 
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 // The asset tree.

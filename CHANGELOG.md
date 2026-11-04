@@ -11,6 +11,22 @@
 
 ### 修复
 
+## [0.5.0] - 2026-11-04
+
+### ⚠️ 更名（breaking）
+
+- 项目名去掉 `mcp`（本服务不止 MCP——接下来同时提供 HTTP API）：
+  - **`jumpserver-mcp` → `jumpserver-mgmt`**（本仓）
+  - `jumpserver-mcp-exec` → `jumpserver-exec`
+  - 底座 `jumpserver-mcp-kit` → `jumpserver-kit`（**v0.2.0**，模块路径
+    `github.com/yi-nology/jumpserver-kit`）
+- 接线影响：`go install` 路径变为 `github.com/yi-nology/jumpserver-mgmt@latest`，
+  二进制名 `jumpserver-mgmt`；本机 MCP 配置里的 `command` 指向的运行时目录变为
+  `~/.local/jumpserver-mgmt-runtime/<时间戳>/`（发布脚本同一套规矩）。
+- GitHub 仓名同步更名（旧 URL 自动跳转）；历史条目里的旧名已统一改写为新名，
+  旧 → 新映射以本条为准。
+- 本次只动名字，工具面（97 个工具）与行为不变。
+
 ## [0.4.4] - 2026-11-04
 
 ### 修复
@@ -119,12 +135,12 @@
     空、什么时候不再是空的。
 
 - ⚠️ **`go install` 的路径变了**：
-  `go install github.com/yi-nology/jumpserver-mcp/cmd/jumpserver-mcp@latest`
-  ⇒ `go install github.com/yi-nology/jumpserver-mcp@latest`。
+  `go install github.com/yi-nology/jumpserver-mgmt/cmd/jumpserver-mgmt@latest`
+  ⇒ `go install github.com/yi-nology/jumpserver-mgmt@latest`。
   ⚠️ **旧路径不再存在** ⇒ 用旧命令装的人要改一次。
   release 页的二进制下载**不受影响**。
 
-- ⚠️ **底座要求抬到 `jumpserver-mcp-kit v0.1.4`**：入口层的新布局要底座
+- ⚠️ **底座要求抬到 `jumpserver-kit v0.1.4`**：入口层的新布局要底座
   的守卫认（新判据 + 新增的「一个仓一个二进制」守卫）。
 - 版本号 0.3.3 → 0.4.0（目录重排是**破坏性**改动 ⇒ 抬 minor；
   旧 tag 不可移动，所以只能往前发）。
@@ -137,7 +153,7 @@
 
 - ⚠️ **`checksums.txt` 里的路径带目录前缀 ⇒ 校验形同虚设**：
   实测 `v0.3.2` 的 checksums 里写的是
-  `./jumpserver-mcp-linux-amd64/jumpserver-mcp-linux-amd64`，
+  `./jumpserver-mgmt-linux-amd64/jumpserver-mgmt-linux-amd64`，
   而**下载页上的资产是扁平的** ⇒ 用户在下载目录跑
   `sha256sum -c checksums.txt` 会报「文件不存在」。
   ⇒ 算哈希时读源文件，只把输出里的路径换成 basename。
@@ -180,7 +196,7 @@
 
 - ⚠️ **`v0.3.0` 那个 tag 是坏的**（已删除）：它在 CI 还红的时候被打出来 ⇒
   `.gitignore` 的 `coverage.*` 把同名**源码** `biz/handler/coverage.go`
-  吞掉 ⇒ 那个 tag 缺文件 ⇒ `go install github.com/yi-nology/jumpserver-mcp@v0.3.0`
+  吞掉 ⇒ 那个 tag 缺文件 ⇒ `go install github.com/yi-nology/jumpserver-mgmt@v0.3.0`
   **编译失败**。现在 `v0.3.1` 是第一个可用的 tag。
   ⇒ 三个仓的 CI 都加了 `on: push: tags` ⇒ **tag 也会跑 CI**，坏掉的 tag 会当场红。
 
@@ -193,7 +209,7 @@
 
 ### 变更
 
-- **底座版本抬到 `jumpserver-mcp-kit v0.1.1`**：那一版修掉了
+- **底座版本抬到 `jumpserver-kit v0.1.1`**：那一版修掉了
   「三条底座守卫其实从未执行过」的问题（`protocolLayerFile` 拿带 `.go` 的
   文件名去比导入路径 ⇒ 永不相等 ⇒ 状态词汇 / 能力监视名单 / 发行版词汇
   三条检查一条都没跑过，而守卫仍报绿）。
@@ -226,14 +242,14 @@
 - **门禁与留痕接线**：`confirm=true` 规则、风险分级、每次调用一行留痕
   （含脱敏后的参数、门禁每一段的判定与理由、放行与否、耗时、失败标记）。
 - **共用底座**：协议层、门禁、输出契约、留痕、脱敏、风险分类、失败分类、共用词汇 ——
-  在 [jumpserver-mcp-kit](https://github.com/yi-nology/jumpserver-mcp-kit) 仓。
+  在 [jumpserver-kit](https://github.com/yi-nology/jumpserver-kit) 仓。
 
 ### 变更
 
-- ⚠️ **改名**：本项目从单体仓 `jms-mcp` 拆成独立仓 `jumpserver-mcp`。
-  - 二进制：`jumpserver-mcp`（单体仓时代就叫这个名字，现在它是独立仓的产物；
-    产物落在 `./bin/`，发布落在 `~/.local/jumpserver-mcp-runtime/<时间戳>/`）。
+- ⚠️ **改名**：本项目从单体仓 `jms-mcp` 拆成独立仓 `jumpserver-mgmt`。
+  - 二进制：`jumpserver-mgmt`（单体仓时代就叫这个名字，现在它是独立仓的产物；
+    产物落在 `./bin/`，发布落在 `~/.local/jumpserver-mgmt-runtime/<时间戳>/`）。
   - MCP 服务名：客户端配置里的 key 默认为 `jumpserver`（部署时可改）；
-    留痕（审计）里的 `service` 字段是 `jumpserver-mcp`。
+    留痕（审计）里的 `service` 字段是 `jumpserver-mgmt`。
   - ⚠️ **老留痕不会自动迁移**：留痕目录从 `~/.local/state/jms-mcp/audit` 改为
-    `~/.local/state/jumpserver-mcp/audit`（见 kit 仓的 CHANGELOG）。
+    `~/.local/state/jumpserver-mgmt/audit`（见 kit 仓的 CHANGELOG）。

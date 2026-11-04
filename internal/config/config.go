@@ -19,8 +19,8 @@ import (
 
 	"github.com/oekit/core/config"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/audit"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // Config is the effective configuration of the management-plane server.
@@ -98,7 +98,7 @@ type Config struct {
 	Burst             int `yaml:"burst" env:"JMS_BURST" default:"40"`
 
 	// ServerName identifies this server in the audit trail of the gate.
-	ServerName string `yaml:"server_name" env:"JMS_SERVER_NAME" default:"jumpserver-mcp"`
+	ServerName string `yaml:"server_name" env:"JMS_SERVER_NAME" default:"jumpserver-mgmt"`
 
 	// AuditMode says whether the gate's trail is written to a FILE: "file"
 	// or "off" (the log only).
@@ -109,7 +109,7 @@ type Config struct {
 	AuditMode string `yaml:"audit_mode" env:"JMS_AUDIT" default:"file" options:"file,off"`
 
 	// AuditDir is where the trail files are written.
-	AuditDir string `yaml:"audit_dir" env:"JMS_AUDIT_DIR" default:"~/.local/state/jumpserver-mcp/audit"`
+	AuditDir string `yaml:"audit_dir" env:"JMS_AUDIT_DIR" default:"~/.local/state/jumpserver-mgmt/audit"`
 	// AuditRetentionDays is how many days of trail files are kept.
 	//
 	// ⚠️ The trail is one file per PROCESS, so the directory grows with

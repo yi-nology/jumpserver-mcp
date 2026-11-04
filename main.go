@@ -1,4 +1,4 @@
-// Command jumpserver-mcp exposes a curated JumpServer REST API surface as
+// Command jumpserver-mgmt exposes a curated JumpServer REST API surface as
 // MCP tools.
 //
 // Design note: the upstream official server (github.com/jumpserver/mcp) derives
@@ -46,15 +46,15 @@
 //	idl/jmsms/                     ← 契约，thrift
 //
 // 共用底座（协议层、门禁、结果整形、留痕、脱敏、失败分类）在**另一个仓**：
-// github.com/yi-nology/jumpserver-mcp-kit。
+// github.com/yi-nology/jumpserver-kit。
 
 package main
 
 // Version is the version of the management-plane server.
 //
-// ⚠️ **它必须与本仓的 tag 一致** —— `go install ...@v0.4.4` 装出来的二进制
+// ⚠️ **它必须与本仓的 tag 一致** —— `go install ...@v0.5.0` 装出来的二进制
 // 要自己说对版本；说错的话，用户看 `--version` 会以为装错了版本。
-const Version = "0.4.4"
+const Version = "0.5.0"
 
 func main() {
 	dispatch()

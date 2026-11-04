@@ -3,7 +3,7 @@ package handler
 import (
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
 // A bulk registration that partly failed has to say so AT THE CALL LEVEL.

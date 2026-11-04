@@ -24,22 +24,22 @@ package handler
 import (
 	"context"
 	"fmt"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"maps"
 	"slices"
 	"sort"
 	"strings"
 
-	"github.com/yi-nology/jumpserver-mcp/internal/service"
+	"github.com/yi-nology/jumpserver-mgmt/internal/service"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/oekit/pkg/convert"
 	"github.com/oekit/pkg/slicex"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/render"
-	"github.com/yi-nology/jumpserver-mcp/biz/model/jmsms"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/pkg/render"
+	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 // touchAsset is one asset's bucket of contact history.

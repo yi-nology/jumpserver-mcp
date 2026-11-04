@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/audit"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 // offlineClient is a client with no token: the doctor stops at the token

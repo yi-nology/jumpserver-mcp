@@ -24,7 +24,7 @@ skills/
 | `jms-access-review` | 谁能登哪台机器、授权语义、权限过大核查、离职审计 | 否（只读） |
 
 ⚠️ **执行面的 skill 在另一个仓**：`jms-exec-ops`（在机器上跑命令、批量并发、长任务、传文件、
-大输出）在 [`yi-nology/jumpserver-mcp-exec`](https://github.com/yi-nology/jumpserver-mcp-exec) 仓里 ——
+大输出）在 [`yi-nology/jumpserver-exec`](https://github.com/yi-nology/jumpserver-exec) 仓里 ——
 它跟着执行面服务走，不跟着管理面走。
 
 **分工原则**：入口 skill 不重复专项 skill 的细节，只给「该加载哪个」和速查表。
@@ -38,7 +38,7 @@ skills/
 装法（把仓里的 skill 复制过去）：
 
 ```bash
-cd /path/to/jumpserver-mcp
+cd /path/to/jumpserver-mgmt
 for s in jumpserver-ops jms-onboarding jms-access-review; do
   mkdir -p ~/.minimax/agents/mavis/skills/$s
   cp skills/$s/SKILL.md ~/.minimax/agents/mavis/skills/$s/
@@ -50,7 +50,7 @@ done
 执行面的 skill 同理（在执行面仓里装）：
 
 ```bash
-cd /path/to/jumpserver-mcp-exec
+cd /path/to/jumpserver-exec
 s=jms-exec-ops
 mkdir -p ~/.minimax/agents/mavis/skills/$s
 cp skills/$s/SKILL.md ~/.minimax/agents/mavis/skills/$s/

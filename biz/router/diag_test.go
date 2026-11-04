@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/oekit/pkg/convert"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp/biz/handler"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
-	"github.com/yi-nology/jumpserver-mcp/internal/service/policy"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-mgmt/biz/handler"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
+	"github.com/yi-nology/jumpserver-mgmt/internal/service/policy"
 )
 
 // diagCheck is the shape the diagnostic contract puts on the wire.

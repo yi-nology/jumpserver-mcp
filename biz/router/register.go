@@ -1,9 +1,9 @@
 package router
 
 import (
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp/biz/handler"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-mgmt/biz/handler"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 // Register puts every tool of the management plane on the server.

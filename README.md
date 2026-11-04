@@ -1,4 +1,4 @@
-# jumpserver-mcp — JumpServer 堡垒机的**管理面** MCP 服务
+# jumpserver-mgmt — JumpServer 堡垒机的**管理面** MCP 服务
 
 让 AI agent **经堡垒机**管理你的基础设施：资产、账号、授权、命令过滤、登录 ACL、审计检索 ——
 全程留审计录像。
@@ -9,9 +9,9 @@
 
 | 仓库 | 是什么 | 工具数 |
 |---|---|---|
-| **`yi-nology/jumpserver-mcp`**（本仓） | **管理面**：资产 / 账号 / 授权 / 连通性 / 命令过滤 / 标签 / 审计 / 登录策略 | 97 |
-| [`yi-nology/jumpserver-mcp-exec`](https://github.com/yi-nology/jumpserver-mcp-exec) | **执行面**：经堡垒机 koko(2222) 在受管机器上跑命令、传文件 | 15 |
-| [`yi-nology/jumpserver-mcp-kit`](https://github.com/yi-nology/jumpserver-mcp-kit) | 共用底座：协议层 / 门禁 / 输出契约 / 留痕 / 脱敏（**是库，不是服务**） | — |
+| **`yi-nology/jumpserver-mgmt`**（本仓） | **管理面**：资产 / 账号 / 授权 / 连通性 / 命令过滤 / 标签 / 审计 / 登录策略 | 97 |
+| [`yi-nology/jumpserver-exec`](https://github.com/yi-nology/jumpserver-exec) | **执行面**：经堡垒机 koko(2222) 在受管机器上跑命令、传文件 | 15 |
+| [`yi-nology/jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) | 共用底座：协议层 / 门禁 / 输出契约 / 留痕 / 脱敏（**是库，不是服务**） | — |
 
 **AI 访问机器一律经堡垒机**，不接受直连 SSH —— 直连会丢审计录像。
 
@@ -33,11 +33,11 @@ PrivateToken 在堡垒机上拿：v5 是 `设置 → API 授权`，v4 是 `用�
 
 ```bash
 # 方式一：go install（需要 Go 1.26+）
-go install github.com/yi-nology/jumpserver-mcp@latest
+go install github.com/yi-nology/jumpserver-mgmt@latest
 
 # 方式二：release 二进制（见 Releases 页）
-curl -LO https://github.com/yi-nology/jumpserver-mcp/releases/latest/download/jumpserver-mcp-linux-amd64
-chmod +x jumpserver-mcp-linux-amd64
+curl -LO https://github.com/yi-nology/jumpserver-mgmt/releases/latest/download/jumpserver-mgmt-linux-amd64
+chmod +x jumpserver-mgmt-linux-amd64
 ```
 
 ### 2.2 接线（MCP 配置）
@@ -46,7 +46,7 @@ chmod +x jumpserver-mcp-linux-amd64
 {
   "mcpServers": {
     "jumpserver": {
-      "command": "jumpserver-mcp",
+      "command": "jumpserver-mgmt",
       "env": {
         "JUMPSERVER_URL": "https://jumpserver.example.com",
         "JUMPSERVER_TOKEN": "<你的 PrivateToken>"
@@ -56,13 +56,13 @@ chmod +x jumpserver-mcp-linux-amd64
 ```
 
 ⚠️ `JUMPSERVER_URL` 填部署的根地址，**不要带 `/api/v1`**（客户端自己拼），也不带结尾斜杠。
-⚠️ 别把 token 写进命令行参数 —— 进程参数同机可见。走环境变量或 `~/.config/jumpserver-mcp/` 下的
+⚠️ 别把 token 写进命令行参数 —— 进程参数同机可见。走环境变量或 `~/.config/jumpserver-mgmt/` 下的
 文件（0600）。
 
 ### 2.3 自检
 
 ```bash
-jumpserver-mcp --doctor   # 接线 + 堡垒机配置体检
+jumpserver-mgmt --doctor   # 接线 + 堡垒机配置体检
 ```
 
 退出码：`0` = 正常，`1` = 有问题（看 `FAIL` 行），`2` = 用法错误。
@@ -102,7 +102,7 @@ jumpserver-mcp --doctor   # 接线 + 堡垒机配置体检
 不看你配没配 `JUMPSERVER_TOKEN`。**没有凭据时，调用会在进门那一刻失败**
 （报「没配 URL / 没配 token」），而不是那个工具从清单里消失。
 
-⇒ 所以 `jumpserver-mcp tools` 列出的数目**永远是 97**；它不变少，
+⇒ 所以 `jumpserver-mgmt tools` 列出的数目**永远是 97**；它不变少，
 少的是「能用」的那部分。
 
 ⚠️ **执行面不一样**：它有一个工具（`jmsx_inventory`，查资产清单）需要 REST
@@ -123,7 +123,7 @@ client ⇒ 没有 `JUMPSERVER_TOKEN` 时它**不注册** ⇒ 执行面是 14 而
 | **只读模式** | `JMS_READ_ONLY=true` ⇒ 一切会改东西的工具直接拒绝 | 管理面与执行面都支持 |
 
 > 上面三个 `pkg/*` 现在住在
-> [`jumpserver-mcp-kit`](https://github.com/yi-nology/jumpserver-mcp-kit) —— 它们是两个服务
+> [`jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) —— 它们是两个服务
 > 共用的底座，不认任何一个服务。
 
 `skills/` 下有 3 个给 AI agent 的操作手册（选工具的正确姿势、机器上线怎么走、
@@ -179,8 +179,8 @@ client ⇒ 没有 `JUMPSERVER_TOKEN` 时它**不注册** ⇒ 执行面是 14 而
 目录按 **CloudWeGo hz 的标准骨架**摆（`cmd/` `biz/` `idl/` `internal/` `pkg/` `etc/` `script/`）。
 
 ⚠️ **入口层在仓根**：一个仓一个二进制，二进制就是仓根那个 `package main` ⇒
-`go install github.com/yi-nology/jumpserver-mcp@latest` 装出来的就是它
-（**不是** `…/cmd/jumpserver-mcp@latest` —— 那个路径没有了）。
+`go install github.com/yi-nology/jumpserver-mgmt@latest` 装出来的就是它
+（**不是** `…/cmd/jumpserver-mgmt@latest` —— 那个路径没有了）。
 
 ⚠️ **`cmd/` 里是子命令，不是二进制**：那些包是入口层 import 的普通包。
 而**实现不住在仓根** —— 仓根那个 package 是 `main`，Go **不许 import 一个
@@ -230,8 +230,8 @@ main 包** ⇒ 子命令的实现只能在 `cmd/` 下。
 | [`SECURITY.md`](SECURITY.md) | 漏洞报告与凭据处理纪律 |
 
 底座与执行面的文档在各自的仓里：
-[`jumpserver-mcp-kit`](https://github.com/yi-nology/jumpserver-mcp-kit) ·
-[`jumpserver-mcp-exec`](https://github.com/yi-nology/jumpserver-mcp-exec)。
+[`jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) ·
+[`jumpserver-exec`](https://github.com/yi-nology/jumpserver-exec)。
 
 ---
 

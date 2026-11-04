@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
 // The RBAC fixtures are the BYTES the real bastion answered with (read off

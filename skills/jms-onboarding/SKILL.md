@@ -138,7 +138,7 @@ jms_gather_apply {"asset":"192.0.2.71","confirm":true}
 | 建用户 400 `{"username":["... already exists"]}` | 重名 |
 | 授权里点名的账号不存在 | `jms_asset_audit` 会点名；`jms_permission_get` 看 accounts 字段 |
 | 资产连不上 | `jmsx_reachable` → 不通则 `jms_connectivity_check` 看协议与连通性 |
-| koko 登不上 | `jumpserver-mcp-exec --doctor` 的 `key_type`（必须 ssh-rsa） |
+| koko 登不上 | `jumpserver-exec --doctor` 的 `key_type`（必须 ssh-rsa） |
 
 **v5 API 的完整坑表**见
 [`jumpserver-ops/references/v5-api-traps.md`](../jumpserver-ops/references/v5-api-traps.md)。

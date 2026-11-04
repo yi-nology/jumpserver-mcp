@@ -12,7 +12,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/yi-nology/jumpserver-mcp/cmd/serve"
+	"github.com/yi-nology/jumpserver-mgmt/cmd/serve"
 )
 
 // defaultCommand is the command that runs when there is no subcommand.

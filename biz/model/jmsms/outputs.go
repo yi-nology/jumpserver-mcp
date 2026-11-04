@@ -15,7 +15,7 @@ package jmsms
 // here.
 
 import (
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 )
 
 // SecurityReviewResult is what jms_security_review answers.

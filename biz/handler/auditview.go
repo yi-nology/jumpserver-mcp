@@ -24,16 +24,16 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/yi-nology/jumpserver-mcp/biz/model/jmsms"
+	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/oekit/pkg/convert"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/render"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
-	"github.com/yi-nology/jumpserver-mcp/internal/service"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/pkg/render"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
+	"github.com/yi-nology/jumpserver-mgmt/internal/service"
 )
 
 func RegisterAuditViewTools(r *reg.Registry, c *repository.Client) {

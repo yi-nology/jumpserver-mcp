@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository/livetest"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository/livetest"
 )
 
 // The node tree's ancestry.

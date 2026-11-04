@@ -13,7 +13,7 @@ JumpServer **v5.0** 堡垒机的精简 MCP（Model Context Protocol）工具集�
 量级，agent 的工具选择会明显失准，每轮对话还要为工具定义付出大量上下文。另外该仓库**没有 LICENSE 文件**。
 
 本仓暴露 **97 个**经过挑选的工具：只读/审计、批量作业、以及一批带 confirm 闸门的写操作
-（**准确**的清单与每个工具的风险见 `jumpserver-mcp tools`）。
+（**准确**的清单与每个工具的风险见 `jumpserver-mgmt tools`）。
 
 工具的返回契约由 `idl/jmsms/` 定义（入口 `jmsms.thrift` include 各域文件；
 诊断报告 / 列表元信息 / 工具声明 / 失败），生成物在 `biz/model/jmsms/`；工具的风险与确认要求集中在
@@ -290,8 +290,8 @@ os.environ.setdefault(\"DJANGO_SETTINGS_MODULE\",\"jumpserver.settings\")
 import django; django.setup()
 from django.conf import settings
 sys.stdout.write(settings.CHAT_AI_DELEGATION_SECRET)"' \
-  > ~/.config/jumpserver-mcp/delegation.key
-chmod 600 ~/.config/jumpserver-mcp/delegation.key
+  > ~/.config/jumpserver-mgmt/delegation.key
+chmod 600 ~/.config/jumpserver-mgmt/delegation.key
 ```
 
 `user_id` / `org_id` 用现有 Token 自动解析（查 `ai` 用户与 DEFAULT 组织），
@@ -476,8 +476,8 @@ v5 实际存在独立的 `SSHKey` 表。`jms_user_sshkey_add` 走的是真正生
 ## 构建
 
 ```bash
-cd ~/my_project/jumpserver-mcp
-go build -o jumpserver-mcp .
+cd ~/my_project/jumpserver-mgmt
+go build -o jumpserver-mgmt .
 go vet ./...
 python3 e2e_test.py     # 端到端测试，会在真实资产上跑一条只读命令
 ```
@@ -489,6 +489,6 @@ python3 e2e_test.py     # 端到端测试，会在真实资产上跑一条只读
 
 ```bash
 # 已完成：
-# mcp create name=jumpserver command=/usr/local/bin/jumpserver-mcp \
+# mcp create name=jumpserver command=/usr/local/bin/jumpserver-mgmt \
 #   env: JUMPSERVER_URL=https://jumpserver.example.com, JUMPSERVER_TOKEN=<PrivateToken>
 ```

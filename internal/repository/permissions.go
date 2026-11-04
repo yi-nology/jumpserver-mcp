@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/oekit/pkg/convert"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 func (c *Client) PermissionIDByName(ctx context.Context, ref string) (string, error) {

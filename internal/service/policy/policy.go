@@ -14,8 +14,8 @@
 package policy
 
 import (
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 )
 
 // Policy is the risk side of the tool catalogue: what each tool does to the

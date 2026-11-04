@@ -19,9 +19,9 @@ package service
 
 import (
 	"github.com/oekit/pkg/convert"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 
-	"github.com/yi-nology/jumpserver-mcp/biz/model/jmsms"
+	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
 )
 
 // SessionErrorReason reads a session's error_reason.

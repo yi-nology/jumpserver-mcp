@@ -17,7 +17,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/redact"
+	"github.com/yi-nology/jumpserver-kit/pkg/redact"
 )
 
 var (

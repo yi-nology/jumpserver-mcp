@@ -17,7 +17,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 
 	"github.com/oekit/pkg/convert"
 )

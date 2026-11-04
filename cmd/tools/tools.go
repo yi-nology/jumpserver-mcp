@@ -11,10 +11,10 @@ import (
 
 	"github.com/oekit/pkg/cli"
 
-	"github.com/yi-nology/jumpserver-mcp/biz/router"
-	"github.com/yi-nology/jumpserver-mcp/internal/config"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
-	"github.com/yi-nology/jumpserver-mcp/internal/service/policy"
+	"github.com/yi-nology/jumpserver-mgmt/biz/router"
+	"github.com/yi-nology/jumpserver-mgmt/internal/config"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
+	"github.com/yi-nology/jumpserver-mgmt/internal/service/policy"
 )
 
 // Run lists the tool catalogue: name, risk, and what it asks for.
@@ -26,7 +26,7 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 	if err != nil {
 		// The catalogue does not need a bastion, but the config does need to
 		// parse. A missing token is not fatal here.
-		cfg = &config.Config{ServerName: "jumpserver-mcp"}
+		cfg = &config.Config{ServerName: "jumpserver-mgmt"}
 	}
 	c, err := repository.New(cfg)
 	if err != nil {

@@ -39,7 +39,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 )
 
 // The three grades, spelled once.

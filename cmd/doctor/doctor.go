@@ -11,11 +11,11 @@ import (
 
 	"github.com/oekit/pkg/cli"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp/biz/handler"
-	"github.com/yi-nology/jumpserver-mcp/biz/model/jmsms"
-	"github.com/yi-nology/jumpserver-mcp/internal/config"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-mgmt/biz/handler"
+	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
+	"github.com/yi-nology/jumpserver-mgmt/internal/config"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 // Run checks the wiring and prints the report.
@@ -59,7 +59,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 // The report is the contract type the doctor answers with, so the CLI reads
 // the same fields the tool hands out.
 func Render(report *jmsms.DoctorResult) string {
-	r := cli.NewReport("jumpserver-mcp doctor")
+	r := cli.NewReport("jumpserver-mgmt doctor")
 	r.Header(fmt.Sprintf("base_url: %v", report.BaseURL))
 	// The identity is only known once the bastion answered, so the line is
 	// printed only then -- the same as before, when it was a map that was

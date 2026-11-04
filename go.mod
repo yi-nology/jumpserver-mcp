@@ -1,19 +1,19 @@
-// jumpserver-mcp —— JumpServer 堡垒机的**管理面** MCP 服务。
+// jumpserver-mgmt —— JumpServer 堡垒机的**管理面** MCP 服务。
 //
 // 管堡垒机本身：资产、账号、授权、命令过滤、登录 ACL、审计检索、取证时间线。
 // 97 个工具。
 //
-// 共用的底座在 jumpserver-mcp-kit（协议层、门禁、契约、留痕、脱敏、风险分类），
+// 共用的底座在 jumpserver-kit（协议层、门禁、契约、留痕、脱敏、风险分类），
 // 本仓只放**这个服务自己的**东西：工具实现、输出契约、领域规则、REST 客户端。
 //
 // ⚠️ 不写 replace：依赖按普通方式从 module cache 解析，go.sum 钉住内容。
 
-module github.com/yi-nology/jumpserver-mcp
+module github.com/yi-nology/jumpserver-mgmt
 
 go 1.26.0
 
 require (
-	github.com/yi-nology/jumpserver-mcp-kit v0.1.9
+	github.com/yi-nology/jumpserver-kit v0.2.0
 
 	github.com/google/jsonschema-go v0.4.3
 	github.com/modelcontextprotocol/go-sdk v1.8.0

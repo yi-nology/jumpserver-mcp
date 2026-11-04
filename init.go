@@ -20,19 +20,19 @@ import (
 	"github.com/oekit/logx"
 	"github.com/oekit/pkg/cli"
 
-	"github.com/yi-nology/jumpserver-mcp/cmd/doctor"
-	"github.com/yi-nology/jumpserver-mcp/cmd/tools"
+	"github.com/yi-nology/jumpserver-mgmt/cmd/doctor"
+	"github.com/yi-nology/jumpserver-mgmt/cmd/tools"
 )
 
 // dispatch runs the command line and exits with the command's exit code.
 func dispatch() {
 	// The log backend writes to stderr, never to stdout: stdout carries the
 	// JSON-RPC stream, and a log line there would corrupt the protocol.
-	logx.SetDefault(logx.NewSlogLogger("jumpserver-mcp",
+	logx.SetDefault(logx.NewSlogLogger("jumpserver-mgmt",
 		logx.WithHandler(slog.NewJSONHandler(os.Stderr, nil))))
 
 	app := &cli.App{
-		Name:    "jumpserver-mcp",
+		Name:    "jumpserver-mgmt",
 		Version: Version,
 		// No arguments means "run the default way": this server is started by
 		// a framework that passes no subcommand name, and "no subcommand"

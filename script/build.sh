@@ -12,7 +12,7 @@
 #     ./script/build.sh --help
 #
 # 产物：
-#     ./bin/jumpserver-mcp      ← 本仓唯一的二进制
+#     ./bin/jumpserver-mgmt      ← 本仓唯一的二进制
 #
 # 环境：
 #     GOPROXY / GOFLAGS  一律按 Go 的默认走，不在本脚本里写死。
@@ -23,7 +23,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-BIN_NAME="jumpserver-mcp"
+BIN_NAME="jumpserver-mgmt"
 BIN_DIR="$ROOT/bin"
 
 RUN_TESTS=1

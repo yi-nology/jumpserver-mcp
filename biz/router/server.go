@@ -13,10 +13,10 @@ package router
 import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp/internal/config"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
-	"github.com/yi-nology/jumpserver-mcp/internal/service/policy"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-mgmt/internal/config"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
+	"github.com/yi-nology/jumpserver-mgmt/internal/service/policy"
 )
 
 // Options is what the caller may turn when it assembles the server.
@@ -49,7 +49,7 @@ func New(cfg *config.Config, c *repository.Client, version string, opts Options)
 func implementation(cfg *config.Config, version string) *mcp.Implementation {
 	name := cfg.ServerName
 	if name == "" {
-		name = "jumpserver-mcp"
+		name = "jumpserver-mgmt"
 	}
 	return &mcp.Implementation{Name: name, Version: version}
 }

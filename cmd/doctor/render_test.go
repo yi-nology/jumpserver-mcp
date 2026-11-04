@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp/biz/model/jmsms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
 )
 
 // renderDoctor is the CLI wording. It is a pure function so the text can be
@@ -32,7 +32,7 @@ func TestRenderDoctor(t *testing.T) {
 	}
 	out := Render(report)
 	for _, want := range []string{
-		"jumpserver-mcp doctor",
+		"jumpserver-mgmt doctor",
 		"base_url: http://192.0.2.41",
 		"identity: admin (superuser=true)",
 		"[OK  ] api_reachable",

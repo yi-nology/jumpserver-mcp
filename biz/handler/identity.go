@@ -21,8 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 // identityOf returns the credential's own username, display name and

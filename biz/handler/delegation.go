@@ -11,15 +11,15 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/render"
-	"github.com/yi-nology/jumpserver-mcp/biz/model/jmsms"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/pkg/render"
+	"github.com/yi-nology/jumpserver-mgmt/biz/model/jmsms"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 func RegisterDelegationTools(r *reg.Registry, c *repository.Client) {
@@ -64,7 +64,7 @@ func RegisterDelegationTools(r *reg.Registry, c *repository.Client) {
 		if !ok {
 			res.Reason = jms.Opt(why)
 			res.HowToConfigure = jms.Opt("write the bastion's CHAT_AI_DELEGATION_SECRET to " +
-				"~/.config/jumpserver-mcp/delegation.key with mode 0600, or set JMS_DELEGATION_SECRET. " +
+				"~/.config/jumpserver-mgmt/delegation.key with mode 0600, or set JMS_DELEGATION_SECRET. " +
 				"JMS_DELEGATION_USER_ID and JMS_DELEGATION_ORG_ID identify who and which org the call acts as.")
 			return render.Text(res)
 		}

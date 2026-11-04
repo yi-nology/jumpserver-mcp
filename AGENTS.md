@@ -1,10 +1,10 @@
-# AGENTS.md — jumpserver-mcp 迭代指南
+# AGENTS.md — jumpserver-mgmt 迭代指南
 
 > 给 AI agent 的作业说明。**改这个仓的代码前先读完本页**，尤其第 1、2 节。
 
 本仓 = JumpServer 堡垒机的**管理面** MCP 服务：改堡垒机自己的配置 ——
 资产 / 账号 / 权限 / 标签 / 命令过滤 / 登录 ACL / 审计检索 / 取证 / 委派 / 批量作业。
-**97 个工具**，一个二进制 `jumpserver-mcp`。
+**97 个工具**，一个二进制 `jumpserver-mgmt`。
 面向人读的完整说明在 [`README.md`](README.md)，
 **配置与排障看 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)**。
 
@@ -14,15 +14,15 @@
 
 | 仓 | 是什么 | 干什么 |
 |---|---|---|
-| [`yi-nology/jumpserver-mcp`](https://github.com/yi-nology/jumpserver-mcp)（本仓） | MCP server `jumpserver` | **管理面** — 改堡垒机自己的配置 | 
-| [`yi-nology/jumpserver-mcp-exec`](https://github.com/yi-nology/jumpserver-mcp-exec) | MCP server `jumpserver-exec` | **执行面** — 经堡垒机在**受管机器**上跑命令、传文件 |
-| [`yi-nology/jumpserver-mcp-kit`](https://github.com/yi-nology/jumpserver-mcp-kit) | 共用底座（**库**） | 协议层 / 门禁 / 输出契约 / 留痕 / 脱敏 / 风险分类 / 共用词汇 / 守卫的机械 |
+| [`yi-nology/jumpserver-mgmt`](https://github.com/yi-nology/jumpserver-mgmt)（本仓） | MCP server `jumpserver` | **管理面** — 改堡垒机自己的配置 | 
+| [`yi-nology/jumpserver-exec`](https://github.com/yi-nology/jumpserver-exec) | MCP server `jumpserver-exec` | **执行面** — 经堡垒机在**受管机器**上跑命令、传文件 |
+| [`yi-nology/jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) | 共用底座（**库**） | 协议层 / 门禁 / 输出契约 / 留痕 / 脱敏 / 风险分类 / 共用词汇 / 守卫的机械 |
 
 **共享纪律（铁律、验证要求、提交约定、底座怎么发版）在 kit 仓的 AGENTS.md 里**：
-👉 <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md>
+👉 <https://github.com/yi-nology/jumpserver-kit/blob/main/AGENTS.md>
 
 ⚠️ **只读本仓的 agent 也要拿到底线** ⇒ §1 把最关键的铁律**原文重复**了一遍。
-⚠️ **底座在 kit 仓**：本仓 `require github.com/yi-nology/jumpserver-mcp-kit`，
+⚠️ **底座在 kit 仓**：本仓 `require github.com/yi-nology/jumpserver-kit`，
 协议层（`pkg/jmsapi`）、门禁（`pkg/reg`）、结果整形与输出契约（`pkg/render`）、
 留痕（`pkg/audit`）、脱敏（`pkg/redact`）、风险分类（`pkg/risk`）、
 失败分类（`pkg/errs`）、共用词汇（`model/jms`）**都不在本仓**。
@@ -58,8 +58,8 @@ skills/                     # 给 AI 的操作手册
 ```
 
 ⚠️ **入口层在仓根**：一个仓一个二进制，二进制就是仓根那个 `package main` ⇒
-`go install github.com/yi-nology/jumpserver-mcp@latest` 装出来的就是它
-（**不是** `…/cmd/jumpserver-mcp@latest` —— 那个路径没有了）。
+`go install github.com/yi-nology/jumpserver-mgmt@latest` 装出来的就是它
+（**不是** `…/cmd/jumpserver-mgmt@latest` —— 那个路径没有了）。
 
 ⚠️ **`cmd/` 里是子命令，不是二进制**：那些包是入口层 import 的普通包。
 而**实现不住在仓根** —— 仓根那个 package 是 `main`，Go **不许 import 一个
@@ -84,7 +84,7 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
 
 ## 1. 铁律（原文重复 —— 完整版在 kit 仓的 AGENTS.md）
 
-> 完整版：<https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md> §2
+> 完整版：<https://github.com/yi-nology/jumpserver-kit/blob/main/AGENTS.md> §2
 > 下面这几条是**只读本仓也要拿到底线**的。
 
 1. **改源码 ≠ 生效。** 必须走完：`./script/build.sh` → `python3 script/publish-mcp.py`
@@ -107,13 +107,13 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
    只接受 `readonly`/`vendor`，带了会直接报错。
 
 6. **源码树里不要留构建产物。** 产物落在 `./bin/`（发布后落在
-   `~/.local/jumpserver-mcp-runtime/<stamp>/`）。历史上编辑器备份文件
+   `~/.local/jumpserver-mgmt-runtime/<stamp>/`）。历史上编辑器备份文件
    （`main.go.1281232157774820236`）、swap 文件（`.!6188!xxx.go`）、
    零字节标记（`*-go-tmp-umask`）把源目录搞得像垃圾场，**已清理，别再产生**。
 
 7. **大改之后要有一双没参与过的眼睛。** 改动 ≥ 300 行，或动了**协议 / 并发 /
    权限身份 / 失败路径 / 存量行为**其中任何一项，就必须起一个**独立 verifier 子代理**
-   审一遍，提示词用 [`script/review-prompt.md`](https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/script/review-prompt.md)
+   审一遍，提示词用 [`script/review-prompt.md`](https://github.com/yi-nology/jumpserver-kit/blob/main/script/review-prompt.md)
    里的模板。
    - **为什么不是「自己再读一遍」**：自己写的代码自己看不出盲区。本仓有过一次
      独立审阅挑出 3 个 HIGH：超时根本不是超时（还会把同机其他会话一起卡死）、
@@ -410,7 +410,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
    `biz/model/jmsms/contract_test.go` 盯着（守卫身在 kit 的 `pkg/contractscan`）。
 
 3. **doctor 的行为是契约。**
-   - `jumpserver-mcp --doctor` 与 `jumpserver-mcp doctor` 等价；
+   - `jumpserver-mgmt --doctor` 与 `jumpserver-mgmt doctor` 等价；
      退出码沿用 OEKIT `pkg/cli` 的约定：`0` = 正常、`1` = 有问题（看 `FAIL` 行）、
      `2` = 用法错误。⚠️ **`--help` 的退出码是 0**，不是 2 —— 问帮助不是错误路径。
    - 检查项：`api_token` / `api_reachable` / `identity` / `version` /
@@ -468,7 +468,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
 
 | 检查 | 怎么过 |
 |---|---|
-| 编译 | `./script/build.sh` 无错（产物落在 `./bin/jumpserver-mcp`） |
+| 编译 | `./script/build.sh` 无错（产物落在 `./bin/jumpserver-mgmt`） |
 | 单元测试 | 同脚本内置 `go test ./...`，必须全绿（脚本会打印失败日志，不吞掉） |
 | 启动 | `./script/bootstrap.sh` 能起一个进程（stdio 上说 JSON-RPC） |
 | 工具数 | **97**（`biz/router/policy_test.go` 钉住） |
@@ -477,7 +477,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
 | 分层 | 底座不得依赖任何服务；不得 import 执行面；IDL/包/模型三名对齐（`internal/arch/`） |
 | **凭据** | 明文凭据不许进仓（底座 `pkg/arch/credential.go` + 本仓 `internal/arch/management_test.go` 的 `TestThePlaintextCredentialsAreNotInTheRepository`）⇒ 形状 + 语境两半都认；`jms:allow-credential` 是**行级**豁免且**被记账** |
 | 工具不许调裸传输 | `biz/handler/protocol_guard_test.go` 扫源码 |
-| 自检 | `./bin/jumpserver-mcp --doctor` 退出码 0 |
+| 自检 | `./bin/jumpserver-mgmt --doctor` 退出码 0 |
 | 真调 | 重启会话后实际调一次新工具；**重启前**可用 JSON-RPC 直接驱动已发布二进制（参考 `script/verify-mcp-launch.py`） |
 
 ⚠️ **改了输出形状一定要真调一次**（读工具对真堡垒机，写工具对假堡垒机）。
@@ -528,8 +528,8 @@ schema 校验只在答案被返回时才跑，所以「编译过 + 单元测试�
 | [`CHANGELOG.md`](CHANGELOG.md) | 变更记录（Keep a Changelog） |
 | [`docs/JUMPSERVER-API-NOTES.md`](docs/JUMPSERVER-API-NOTES.md) | 管理面细节 |
 | [`skills/`](skills/) | **给 AI 的操作手册**（jumpserver-ops / jms-onboarding / jms-access-review） |
-| **kit 仓的 AGENTS.md** | <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md> —— **共享纪律**（铁律、底座怎么发版、跨仓守卫） |
-| **kit 仓的 ARCHITECTURE.md** | <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/docs/ARCHITECTURE.md> —— 三仓的边界与依赖方向 |
+| **kit 仓的 AGENTS.md** | <https://github.com/yi-nology/jumpserver-kit/blob/main/AGENTS.md> —— **共享纪律**（铁律、底座怎么发版、跨仓守卫） |
+| **kit 仓的 ARCHITECTURE.md** | <https://github.com/yi-nology/jumpserver-kit/blob/main/docs/ARCHITECTURE.md> —— 三仓的边界与依赖方向 |
 
 **AI 访问机器一律经堡垒机 koko(2222)**，不接受直连 SSH —— 直连会丢审计录像。
 

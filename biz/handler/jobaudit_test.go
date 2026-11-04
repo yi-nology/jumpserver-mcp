@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
 // fakeBastionWithJobs serves the two sides of a batch run: the audit log that

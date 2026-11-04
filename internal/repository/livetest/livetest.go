@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 // LiveClient returns a client for the bastion under test.

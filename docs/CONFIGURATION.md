@@ -1,13 +1,13 @@
 # JumpServer MCP 管理面配置指南
 
-管理面 MCP 服务（`jumpserver-mcp`）的配置说明：
+管理面 MCP 服务（`jumpserver-mgmt`）的配置说明：
 怎么接线、每个环境变量是什么、怎么自检、出问题怎么查。
 
 > 本文面向**要装、要调、要修**的人。只想知道「用哪个工具」看
 > [§6 工具选择速查](#6-工具选择速查)；只想跑起来，看 [§2 五分钟装好](#2-五分钟装好)。
 >
 > **执行面**（另一个服务）的配置在
-> [jumpserver-mcp-exec 仓的 CONFIGURATION.md](https://github.com/yi-nology/jumpserver-mcp-exec/blob/main/docs/CONFIGURATION.md)。
+> [jumpserver-exec 仓的 CONFIGURATION.md](https://github.com/yi-nology/jumpserver-exec/blob/main/docs/CONFIGURATION.md)。
 
 ---
 
@@ -15,12 +15,12 @@
 
 ```
        ┌──────────────────┐         ┌──────────────────┐
-       │  jumpserver-mcp  │  REST   │  JumpServer 部署  │
+       │  jumpserver-mgmt  │  REST   │  JumpServer 部署  │
        │  (本服务, 97 工具)├────────►│                  │
        └──────────────────┘         └────────┬─────────┘
                                              │ koko :2222
        ┌──────────────────┐         ┌────────┴─────────┐
-       │ jumpserver-mcp-  │  SSH    │  受管机器          │
+       │ jumpserver-mgmt-  │  SSH    │  受管机器          │
        │ exec (执行面,    ├────────►│  (录像可审计)      │
        │ 15 工具)          │         │                   │
        └──────────────────┘         └───────────────────┘
@@ -30,11 +30,11 @@
 
 | 服务 | 管什么 | 不管什么 |
 |---|---|---|
-| `jumpserver-mcp`（本服务） | 资产、账号、权限、标签、命令过滤、审计、授权 | 不在机器上执行命令 |
-| `jumpserver-mcp-exec`（执行面） | 在机器上跑命令、传文件 | 不改堡垒机配置 |
+| `jumpserver-mgmt`（本服务） | 资产、账号、权限、标签、命令过滤、审计、授权 | 不在机器上执行命令 |
+| `jumpserver-exec`（执行面） | 在机器上跑命令、传文件 | 不改堡垒机配置 |
 
 本服务读 `JUMPSERVER_URL` + `JUMPSERVER_TOKEN`，并且**共用同一份 REST 协议实现**（在
-[jumpserver-mcp-kit](https://github.com/yi-nology/jumpserver-mcp-kit) 仓：
+[jumpserver-kit](https://github.com/yi-nology/jumpserver-kit) 仓：
 传输、重试、限流、v5 的两种列表形状、**端点表**）。
 协议只有一份，所以在管理面修好的东西（比如按字符边界截断、避免切坏多字节字符）
 执行面自动就有。
@@ -85,14 +85,14 @@ cat ~/.ssh/id_rsa.pub
 服务是 **stdio** 传输，用 `mcp update` 指向运行时的二进制：
 
 ```bash
-mcp update name=jumpserver command=<jumpserver-mcp 的绝对路径>
+mcp update name=jumpserver command=<jumpserver-mgmt 的绝对路径>
 ```
 
 `env` 是只写字段（写进去读不回来），一次性把变量都给全：
 
 ```bash
 mcp update name=jumpserver \
-  command=/usr/local/bin/jumpserver-mcp \
+  command=/usr/local/bin/jumpserver-mgmt \
   env='{"JUMPSERVER_URL":"https://jumpserver.example.com","JUMPSERVER_TOKEN":"<token>"}'
 ```
 
@@ -105,7 +105,7 @@ mcp update name=jumpserver \
   "mcpServers": {
     "jumpserver": {
       "type": "stdio",
-      "command": "/usr/local/bin/jumpserver-mcp",
+      "command": "/usr/local/bin/jumpserver-mgmt",
       "env": {
         "JUMPSERVER_URL": "https://jumpserver.example.com",
         "JUMPSERVER_TOKEN": "<token>"
@@ -120,10 +120,10 @@ mcp update name=jumpserver \
 二进制有 `--doctor`，不依赖 MCP 会话，可以直接从 shell 跑：
 
 ```bash
-jumpserver-mcp --doctor    # 管理面接线 + 堡垒机配置体检
+jumpserver-mgmt --doctor    # 管理面接线 + 堡垒机配置体检
 ```
 
-`doctor` 同时也是子命令形态（`jumpserver-mcp doctor`，与 `--doctor` 等价），
+`doctor` 同时也是子命令形态（`jumpserver-mgmt doctor`，与 `--doctor` 等价），
 `--help` 打印用法。退出码沿用 OEKIT `pkg/cli` 的约定：`0` = 正常、`1` = 有问题、
 `2` = 用法错误（未知子命令 / 参数不合法）。
 
@@ -139,16 +139,16 @@ jumpserver-mcp --doctor    # 管理面接线 + 堡垒机配置体检
 | `JUMPSERVER_URL` | **是** | **无** | 堡垒机地址，不要带尾部斜杠（代码会 `TrimRight`），也不带 `/api/v1`。⚠️ **管理面必填**：缺了直接启动失败（报错文案带样例值） |
 | `JUMPSERVER_TOKEN` | **二选一** | 无 | JumpServer **PrivateToken**，呈现为 `Authorization: Token <key>`。⚠️ **不是 v5 专有**：v4 也注册了 `PrivateTokenAuthentication`（就是 DRF 的 `TokenAuthentication`），所以同一行头在两版上是同一个意思。缺失时服务直接启动失败 |
 | `JUMPSERVER_USERNAME` | **二选一** | 无 | 另一种凭据：**用账号密码登录**，堡垒机换成 Bearer token（`POST /api/v1/authentication/auth/`）。给拿不到 PrivateToken 的部署用。v4/v5 都有这个端点 |
-| `JUMPSERVER_PASSWORD` | 跟 `JUMPSERVER_USERNAME` 配 | 无 | 上面那个登录的密码。⚠️ **优先读文件**（`~/.config/jumpserver-mcp/password`，0600），环境变量是退路 —— 长跑进程的环境在 Linux 上是 `/proc` 里谁都能读的 |
+| `JUMPSERVER_PASSWORD` | 跟 `JUMPSERVER_USERNAME` 配 | 无 | 上面那个登录的密码。⚠️ **优先读文件**（`~/.config/jumpserver-mgmt/password`，0600），环境变量是退路 —— 长跑进程的环境在 Linux 上是 `/proc` 里谁都能读的 |
 | `JUMPSERVER_OTP` | 否 | 无 | base32 的 TOTP 密钥。**只在堡垒机要求二次验证时用得上**：没有它，登录会明说「部署要二次因子、没配 TOTP」而不是给一个看不懂的错 |
 | `JUMPSERVER_VERSION` | 否 | `auto` | 堡垒机是 **v4** 还是 **v5**：`v4` / `v5` / `auto`（探测）。⚠️ 它只决定**一件事**：v4 **没有** Chat AI 委派方案 ⇒ 会话只能以 API 凭据的身份跑（= 管理员面）。其余（端点表、认证头、连接令牌体、响应形状）两版一致。详见 §3.5 |
 | `JMS_READ_ONLY` | 否 | `false` | **只读模式**：所有写工具在执行前被拒（结构性拒绝，不是约定）。管理面拒掉 29 个写工具。用来「让 agent 只看不动」 |
 | `JMS_REQUESTS_PER_SECOND` | 否 | `20` | 客户端对堡垒机的请求速率上限（令牌桶）。堡垒机是单体，失控的 agent 不该拿它练手 |
 | `JMS_BURST` | 否 | `40` | 令牌桶的突发额度 |
 | `JUMPSERVER_TIMEOUT` | 否 | `90s` | 单次 API 调用超时。连通性检查 50 台机器很慢，这个值是故意宽的 |
-| `JMS_SERVER_NAME` | 否 | `jumpserver-mcp` | 服务在门禁审计留痕里的标识（留痕的 `service` 字段） |
+| `JMS_SERVER_NAME` | 否 | `jumpserver-mgmt` | 服务在门禁审计留痕里的标识（留痕的 `service` 字段） |
 | `JMS_AUDIT` | 否 | `file` | 门禁留痕要不要**落盘**：`file`（每个进程一份 JSONL）或 `off`（只写 stderr） |
-| `JMS_AUDIT_DIR` | 否 | `~/.local/state/jumpserver-mcp/audit` | 留痕文件放哪（目录 0700、文件 0600）。两个服务写同一个目录 |
+| `JMS_AUDIT_DIR` | 否 | `~/.local/state/jumpserver-mgmt/audit` | 留痕文件放哪（目录 0700、文件 0600）。两个服务写同一个目录 |
 | `JMS_AUDIT_RETENTION_DAYS` | 否 | `7` | 留痕文件保留多少天。**0 或负数 = 不按时间清**（⚠️ 但**空文件**那条规则照样删：安静超过一小时的空文件与保留期无关）。⚠️ 保留期是**文件级**的：超过保留期**且进程已结束**的文件会被清理；正在运行的进程的文件不删 ⇒ 文件里的行可能比这个窗口更老 |
 
 ⚠️ **两种凭据都配了怎么办**：`JUMPSERVER_TOKEN` 赢 —— 它不过期，登录换来的 Bearer token 会过期，
@@ -165,15 +165,15 @@ jumpserver-mcp --doctor    # 管理面接线 + 堡垒机配置体检
 secret 的**推荐存放位置**（权限 0600）：
 
 ```bash
-mkdir -p ~/.config/jumpserver-mcp
-chmod 700 ~/.config/jumpserver-mcp
-printf '%s' "$CHAT_AI_DELEGATION_SECRET" > ~/.config/jumpserver-mcp/delegation.key
-chmod 600 ~/.config/jumpserver-mcp/delegation.key
+mkdir -p ~/.config/jumpserver-mgmt
+chmod 700 ~/.config/jumpserver-mgmt
+printf '%s' "$CHAT_AI_DELEGATION_SECRET" > ~/.config/jumpserver-mgmt/delegation.key
+chmod 600 ~/.config/jumpserver-mgmt/delegation.key
 ```
 
 程序会依次找 `JMS_DELEGATION_SECRET` 环境变量 →
-`~/.config/jumpserver-mcp/delegation.key` →
-`~/.local/etc/jumpserver-mcp/delegation.key`。
+`~/.config/jumpserver-mgmt/delegation.key` →
+`~/.local/etc/jumpserver-mgmt/delegation.key`。
 
 **委派凭据是什么**：一次性、单次、60 秒内有效、绑定
 「方法 + 路径 + query + body」的凭据。它**不额外授权** —— 走的是正常 RBAC，
@@ -219,13 +219,13 @@ POST /api/v1/authentication/auth/  {"username": "...", "password": "..."}
 | 落在哪 | `JMS_AUDIT_DIR` 下的 `audit-<日期>-<pid>-<随机>.jsonl`，**每个进程一份** |
 | 权限 | 目录 0700、文件 0600 |
 | 格式 | 一行一个 JSON：`ts` / `service` / `tool` / `client` / `args` / `allowed` / `refused` / `dry_run` / `would_execute` / `failed` / `stages[]` / `duration_ms` / `out_bytes` / `error` / `delivery` |
-| `service` | **服务名**：本服务是 `jumpserver-mcp`（可用 `JMS_SERVER_NAME` 改） |
+| `service` | **服务名**：本服务是 `jumpserver-mgmt`（可用 `JMS_SERVER_NAME` 改） |
 | `allowed` 的口径 | **「没有被拒绝」，不是「跑成功了」**。⚠️ **管理面的写操作没带 `confirm` 时，SDK 的输入契约校验先拒掉它** ⇒ 那一行 `allowed=false`、`failed=true`、`stages[]` **为空**（门禁没跑过） |
 | `failed` | **这次调用的「活」干砸了**。⚠️ **门禁拒掉一次调用不算失败** —— 那是门禁在干活。⚠️ 管理面的 `jms_status` 属于这一类：它那一格是「**身份探针**没成」（无害，不是「有命令在机器上跑」） |
 | `error` | **这次调用为什么以错误收场**：门禁拒的与工具失败的都装在这儿。⚠️ 想知道「这里什么坏了」用 `failed=true` 筛 |
 | 脱敏 | **每一列自由文本都过同一套脱敏**：参数、错误、**拒绝理由**、门禁每一段的理由 |
 | `args` 截断 | 超过 500 字节会截断，**切在字符边界上** ⇒ 切坏一个多字节字符，会让留痕里的参数**与实际调用的不是同一个字符串** |
-| 怎么读 | `tail -f ~/.local/state/jumpserver-mcp/audit/*.jsonl*`，或用执行面的 `jmsx_audit_query` 工具 |
+| 怎么读 | `tail -f ~/.local/state/jumpserver-mgmt/audit/*.jsonl*`，或用执行面的 `jmsx_audit_query` 工具 |
 | 留痕目录为空时 | 写侧与读侧说**同一句话**：没有目录 = **没有留痕文件** |
 
 ⚠️ **审计类工具的答复也走脱敏**：`jms_command_audit` / `jms_commands_search` /
@@ -300,7 +300,7 @@ POST /api/v1/authentication/auth/  {"username": "...", "password": "..."}
 
 第 1 步漏了 protocols、第 2 步漏了账号、第 3 步的 accounts 传了空列表 ——
 这三个错误**都不会立刻报错**，而是等到登录时才失败，且症状很像「凭据不对」。
-`jumpserver-mcp --doctor` / `jms_doctor` 会直接把这三类问题列出来。
+`jumpserver-mgmt --doctor` / `jms_doctor` 会直接把这三类问题列出来。
 
 ### 4.1 授权的账号粒度
 
@@ -337,10 +337,10 @@ POST /api/v1/authentication/auth/  {"username": "...", "password": "..."}
 
 ## 5. 自检
 
-### 5.1 `jumpserver-mcp --doctor`
+### 5.1 `jumpserver-mgmt --doctor`
 
 ```
-jumpserver-mcp doctor
+jumpserver-mgmt doctor
   base_url: https://jumpserver.example.com
   identity: admin (superuser=true)
 
@@ -435,7 +435,7 @@ CLI 上看到的 `[OK]/[WARN]/[FAIL]` 就是每项 check 的 `status`。
     └── 高危操作不留长期凭证  → jms_delegation_call
 ```
 
-⚠️ **一共 97 个工具**，上表是常用的一批。完整目录跑 `jumpserver-mcp tools`
+⚠️ **一共 97 个工具**，上表是常用的一批。完整目录跑 `jumpserver-mgmt tools`
 （打印名字/风险/确认要求）。
 
 ### 6.2 不确定的时候
@@ -476,7 +476,7 @@ CLI 上看到的 `[OK]/[WARN]/[FAIL]` 就是每项 check 的 `status`。
 |---|---|---|
 | 仓库源码目录 | **源码**，唯一真相 | 你 / AI |
 | `./bin/` | **构建产物** | `script/build.sh` |
-| `~/.local/jumpserver-mcp-runtime/<stamp>/` | **运行时二进制**，MCP 配置指向这里 | `script/publish-mcp.py` |
+| `~/.local/jumpserver-mgmt-runtime/<stamp>/` | **运行时二进制**，MCP 配置指向这里 | `script/publish-mcp.py` |
 | 你的 MCP 客户端配置文件 | **接线**，记录上面那个路径 + 环境变量 | `mcp update` |
 
 **改源码 ≠ 生效。** 已经跑起来的 MCP 进程还持有旧二进制，必须重启会话。

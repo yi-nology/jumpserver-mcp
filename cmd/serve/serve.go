@@ -17,10 +17,10 @@ import (
 
 	"github.com/oekit/pkg/cli"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/audit"
-	"github.com/yi-nology/jumpserver-mcp/biz/router"
-	"github.com/yi-nology/jumpserver-mcp/internal/config"
-	"github.com/yi-nology/jumpserver-mcp/internal/repository"
+	"github.com/yi-nology/jumpserver-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-mgmt/biz/router"
+	"github.com/yi-nology/jumpserver-mgmt/internal/config"
+	"github.com/yi-nology/jumpserver-mgmt/internal/repository"
 )
 
 // Run serves MCP over stdio until the transport closes.

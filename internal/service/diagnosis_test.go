@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 )
 
 func check(name string, status jms.Status, fix string) *jms.Check {
