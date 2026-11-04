@@ -79,6 +79,6 @@ include "status.thrift"
  *   note      截断了或者没匹配上时的一句话说明
  *
  * 诊断类工具的答复 = 共享的 Diagnosis（checks/findings/status/verdict/advice）
- * + 该工具自己的语境字段；那份组合类型在 biz/jumpserver/model/jmsms/outputs.go
+ * + 该工具自己的语境字段；那份组合类型在 biz/model/jmsms/outputs.go
  * 里手写，因为它由几个 IDL 词拼成，不是 IDL 的 struct 能自己说的。
  */

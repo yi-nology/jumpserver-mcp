@@ -63,19 +63,19 @@ python3 script/publish-mcp.py
 
 见 [`../AGENTS.md`](../AGENTS.md) §3（底座那一份写着「在服务仓里怎么加」）。要点：
 
-1. **先想清楚代码落在哪一层** —— 工具本身 → `biz/jumpserver/handler/`；
-   领域判断 → `biz/jumpserver/service/`（纯函数）；
-   堡垒机的资源 → `internal/jumpserver/client/`；
+1. **先想清楚代码落在哪一层** —— 工具本身 → `biz/handler/`；
+   领域判断 → `internal/service/`（纯函数）；
+   堡垒机的资源 → `internal/repository/`；
    URL 与响应形状 → **kit 仓的 `pkg/jmsapi/`**（**别在别处再写一份**）；
 2. **用 `reg.Add` 注册**，不要用 `mcp.AddTool`（后者绕过门禁）；
 3. **声明输出形状**（`OutputSchema`）—— 服务端返回前会按它校验，形状不对直接报错；
 4. **答案必须是契约类型**，不许现拼 map；
-5. **在 `biz/jumpserver/policy/policy.go` 里分类**（只读 / 写 / 不可逆 / 条件确认）；
+5. **在 `internal/service/policy/policy.go` 里分类**（只读 / 写 / 不可逆 / 条件确认）；
 6. **工具描述要写「什么时候用这个工具」**，不是「这个工具做什么」——
    那是 AI 选工具的唯一依据；
 7. **同步改 `skills/`** —— 那里有道检查（文档提到的工具 vs 代码注册的工具），
    有差异就说明脱节了；
-8. **改工具数**（97 → 98）—— 被 `biz/jumpserver/router/policy_test.go` 钉住。
+8. **改工具数**（97 → 98）—— 被 `biz/router/policy_test.go` 钉住。
 
 ## 5. 验证要求（交付前必须过）
 
@@ -86,9 +86,9 @@ python3 script/publish-mcp.py
 | 格式化 | `gofmt -l .` 无输出 |
 | 静态检查 | `go vet ./...` 无错 |
 | 启动 | `./script/bootstrap.sh` 能起进程；`script/verify-mcp-launch.py` 报 `OK ... N tools` |
-| 工具数 | **97**（`biz/jumpserver/router/policy_test.go` 钉住这个数） |
+| 工具数 | **97**（`biz/router/policy_test.go` 钉住这个数） |
 | 目录一致 | 策略表与注册表必须一一对应（同上） |
-| 契约 | 契约类型必须真被产出（`biz/jumpserver/model/jmsms/contract_test.go`）；答案本身必须是契约类型 |
+| 契约 | 契约类型必须真被产出（`biz/model/jmsms/contract_test.go`）；答案本身必须是契约类型 |
 | 分层 | 底座不得依赖任何服务；不得 import 执行面；IDL/包/模型三名对齐（`internal/arch/`） |
 | 自检 | `./bin/jumpserver-mcp --doctor` 退出码 0 |
 | 真调 | 改了输出形状一定要**真调一次**（读工具对真堡垒机，写工具对假堡垒机）—— schema 校验只在答案被返回时才跑 |

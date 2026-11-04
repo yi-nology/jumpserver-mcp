@@ -41,10 +41,10 @@ if [[ $# -gt 0 ]]; then
   for dir in "$@"; do
     [[ "$dir" = /* ]] || dir="$ROOT/$dir"
     base="$(basename "$dir")"
-    generate "$dir/$base.thrift" "$ROOT/biz/jumpserver/model"
+    generate "$dir/$base.thrift" "$ROOT/biz/model"
   done
 else
-  generate "$ROOT/idl/jmsms/jmsms.thrift" "$ROOT/biz/jumpserver/model"
+  generate "$ROOT/idl/jmsms/jmsms.thrift" "$ROOT/biz/model"
 fi
 
 echo "==> 完成；记得把重新生成的模型一起提交"

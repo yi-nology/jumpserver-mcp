@@ -3,7 +3,7 @@
 > ⚠️ **本文件里的每一条，最初都是对着上游 v4.10.20-lts 的源码读出来的**；
 > **2026-10-31 起有一台真 v4.10.20 堡垒机（`192.0.2.21`）**，端点表、版本探测、
 > 连接令牌、登录凭据、执行面**全部实测通过**（见 §6；门控真调在
-> `internal/jumpserver/livetest/v4_test.go`）。
+> `internal/repository/livetest/v4_test.go`）。
 > ⚠️ 但**实测推翻了两条源码推断** —— 说明「读源码」与「跑真机」不是一回事，
 > 这也正是本仓那条老教训：*协议事实要实测，别抄*。
 >
@@ -227,7 +227,7 @@ GET /api/v1/zzz-jms-version-probe-404/  -> 500
 
 | | 状态 |
 |---|---|
-| 端点表 49 条在真 v4 上的应答 | ✅ **实测全通**（门控真调：`internal/jumpserver/livetest/v4_test.go`） |
+| 端点表 49 条在真 v4 上的应答 | ✅ **实测全通**（门控真调：`internal/repository/livetest/v4_test.go`） |
 | 版本探测在真 v4 上判成 v4 | ✅ **实测**（两条路径**答案一样**：chat-ai → 500，必然缺失路径 → 500） |
 | 委派方案在真 v4 上不存在 | ✅ **实测** |
 | 连接令牌用**账号 UUID** | ✅ **实测成功**（账号名 / `@USER` 都被拒 ⇒ 与 v5 一致） |
@@ -264,7 +264,7 @@ GET /api/v1/zzz-jms-version-probe-404/  -> 500
 
 ```
 JMS_TEST_V4_URL=http://<host> JMS_TEST_V4_USERNAME=admin JMS_TEST_V4_PASSWORD='<强口令>' \
-  go test ./internal/jumpserver/livetest/ -run V4 -v
+  go test ./internal/repository/livetest/ -run V4 -v
 ```
 
 ### 6.4 进一台 v4：凭据与账号（2026-11-03 在 `192.0.2.21` 实测）

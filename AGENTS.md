@@ -30,29 +30,50 @@
 **目录约定**（CloudWeGo hz 的标准骨架）：
 
 ```
-cmd/jumpserver-mcp/       # 入口（package main）：serve / doctor / tools / version
-biz/jumpserver/
-├── handler/               # 97 个工具的实现（一个域一个文件，只做解码/编排/渲染）
-├── model/jmsms/           # 契约的生成物（thriftgo slim 模板，产物入库）
-├── policy/                # 工具目录的**风险侧**：每个工具改不改堡垒机、要不要确认
-├── router/                # 装配：哪个域注册哪些工具
-└── service/               # 领域规则（纯函数，可离线单测）
-conf/jumpserver/          # 配置（环境变量 → 结构体）
-idl/jmsms/                # 契约的 thrift 定义：入口 jmsms.thrift + 按域拆的多份
-internal/jumpserver/
-├── client/                # 领域仓储（资产解析、授权展开、账号归属）
-└── livetest/              # 打真堡垒机的那套（由环境变量 gate 住）
-internal/arch/             # 机械守卫（判据；守卫体在 kit 的 pkg/arch）
-script/                    # 构建 / 发布 / 生成 / 校验 / 技能漂移检查
-skills/                    # 给 AI 的操作手册
+main.go / init.go / server.go / workers.go / shutdown.go
+                             # 入口层（**仓根**的 package main）：serve / doctor / tools / version
+cmd/                        # 子命令（入口层 import 的**普通包**，不是二进制）
+├── serve/                  #   默认命令：以 stdio 提供 MCP 服务
+├── doctor/                 #   自检：接线与堡垒机配置
+└── tools/                  #   工具目录：名字、风险、确认要求
+biz/
+├── handler/                # 97 个工具的实现（一个域一个文件，只做解码/编排/渲染）
+├── model/jmsms/            # 契约的生成物（thriftgo slim 模板，产物入库）
+└── router/                 # 装配：哪个域注册哪些工具
+internal/
+├── config/                 # 配置（环境变量 → 结构体）
+├── repository/             # 数据访问层（资产解析、授权展开、账号归属）
+│   └── livetest/           #   打真堡垒机的那套（由环境变量 gate 住）
+├── service/                # 领域规则（纯函数，可离线单测）
+│   └── policy/             #   工具目录的**风险侧**：每个工具改不改堡垒机、要不要确认
+├── arch/                   # 机械守卫（判据；守卫体在 kit 的 pkg/arch）
+├── middleware/             # （空）HTTP 中间件：这一面没有 HTTP
+└── rpchandler/             # （空）RPC 服务端：这一面不对外提供 RPC
+idl/jmsms/                  # 契约的 thrift 定义：入口 jmsms.thrift + 按域拆的多份
+pkg/                        # （空）通用库在 kit 仓，不在这里放东西
+etc/ swagger/ deploy/ monitoring/ rpcx/ kitex_gen/
+                             # （空）hz 骨架里的其余层：见各目录里的 README
+script/                     # 构建 / 发布 / 生成 / 校验 / 技能漂移检查
+skills/                     # 给 AI 的操作手册
 ```
 
+⚠️ **入口层在仓根**：一个仓一个二进制，二进制就是仓根那个 `package main` ⇒
+`go install github.com/yi-nology/jumpserver-mcp@latest` 装出来的就是它
+（**不是** `…/cmd/jumpserver-mcp@latest` —— 那个路径没有了）。
+
+⚠️ **`cmd/` 里是子命令，不是二进制**：那些包是入口层 import 的普通包。
+而**实现不住在仓根** —— 仓根那个 package 是 `main`，Go **不许 import 一个
+main 包** ⇒ 子命令的实现只能在 `cmd/` 下。
+
+⚠️ **空的层不是「忘了做」**：每一层都有自己的 README，写着它为什么空、
+什么时候不再是空的。
+
 hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTTP 路由，
-`biz/jumpserver/router` 就是它们的对应物。
+`biz/router` 就是它们的对应物。
 
 **分层的方向是硬的，有守卫盯着**（判据在本仓 `internal/arch/`，守卫体在 kit 的 `pkg/arch`）：
 - **本仓不得 import 执行面**（另一个服务）；**底座不得依赖任何服务**。
-- **`cmd/` 是最外层，谁都不许 import**。
+- **入口层（仓根 + `cmd/`）是最外层，谁都不许 import**。
 - **IDL 目录名 == 生成包名 == 模型目录名**：`idl/jmsms/` 生成的包必须叫 `jmsms`，
   放在叫 `jmsms` 的目录里。契约按域拆成同目录多份 thrift：入口是 `jmsms.thrift`
   （include 各域文件），**每一份**都声明 `namespace go jmsms` —— 拆的是文件，
@@ -110,8 +131,8 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
 
 9. **声明输出形状（`OutputSchema`），而且答案本身必须是契约类型。**
    服务端在返回前按 schema 校验，形状不对直接报错；机械守卫
-   （`internal/arch/answer_test.go`）盯着「不许手拼 map 的答案或行」。
-   ⚠️ **契约类型写了没人产出 = 契约不存在**（`biz/jumpserver/model/jmsms/contract_test.go` 盯着）。
+   （`internal/arch/management_test.go` 的 `TestTheAnswerTypesAreFoundMechanically`）盯着「不许手拼 map 的答案或行」。
+   ⚠️ **契约类型写了没人产出 = 契约不存在**（`biz/model/jmsms/contract_test.go` 盯着）。
 
 10. **底座改动会波及执行面** ⇒ **改底座前先发 kit 的 tag**，再更新两个服务仓的
     `require`。⚠️ **不许在本仓的 `go.mod` 里写 `replace`**（那会让 `go.mod`
@@ -125,17 +146,17 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
     发布路径、自检结果、以及「**需要重启会话才生效**」这句话。
 
 
-## 2. 管理面的实现要点（`biz/jumpserver/`）
+## 2. 管理面的实现要点（`biz/`）
 
 ### 2.1 分层：谁负责什么
 
 - 底层是 JumpServer REST API，**v4 与 v5 都支持**。**传输、端点表与响应形状在 kit 仓的
-  `pkg/jmsapi/`**（两个服务共用一份），本仓的 `internal/jumpserver/client/` 是它之上的
+  `pkg/jmsapi/`**（两个服务共用一份），本仓的 `internal/repository/` 是它之上的
   **领域仓储**（资产解析、授权展开、账号归属），`biz/service/` 是再上面的**领域规则**
   （纯函数，可离线单测），`biz/handler/` 只做解码/编排/渲染。
   ⚠️ **响应形状的助手（`Label` / `Display` / `Nested` / `AsSlice` / `List` / `Truncate` /
   `FieldName` / `AssetField` / `AssetSummary` / `SplitAssetLabel`）属于**协议**，
-  一律去 `jmsapi` 取，**别在 `internal/jumpserver/client` 里再写一份** ——
+  一律去 `jmsapi` 取，**别在 `internal/client` 里再写一份** ——
   曾经两面各写一份，结果管理面修好了 UTF-8 截断、执行面没修（按字节切，多字节字符被切坏）。
   截断的实现在 kit 的 `pkg/textx` **只此一份**（rune 边界那三行出过三次 UTF-8 事故），
   `jmsapi.Truncate` / 留痕的 `clip`/`truncate` 都是它的薄壳，只是后缀语义不同。
@@ -155,7 +176,7 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
 ⚠️ **2026-10-31 起有真机了**（v4.10.20）：端点表 49 条、版本探测、
 连接令牌（**账号 UUID**）、登录凭据（v4 没有 PrivateToken 的 API 出口 ⇒ 用账号密码
 换 Bearer）、执行面真跑命令，**全部实测通过**（门控真调：
-`internal/jumpserver/livetest/v4_test.go`）。
+`internal/repository/livetest/v4_test.go`）。
 ⚠️ **新增的 8 个端点（文件传输留痕 / 账号自动化 / 网络拓扑）也在 v4 真机上核过**
 （2026-11-01，无认证探测全部回 401 = 路由存在）⇒ **两版路径逐条一致**。
 ⚠️ **实测推翻了两条源码推断**：① v4 的列表端点也是**裸数组**（我曾按源码推断成
@@ -316,13 +337,13 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
 - ⚠️ **形状已知的工具要直接产出契约类型**（`jmsms.XxxResult`），不要现拼 map：
   map 的键名写错编译期不报错，而契约类型写错编译期就红。管理面 97 个工具
   现在全部有具名契约（`render.Object` 与 `render.List` 都已删除），
-  **而且答案本身就是那个类型**（`internal/arch/answer_test.go` 盯着）。
+  **而且答案本身就是那个类型**（`internal/arch/management_test.go` 的 `TestTheAnswerTypesAreFoundMechanically` 盯着）。
 - ⚠️ **一个工具一个契约类型**：工具的几种答法（演练 / 被拦 / 跑了、列全部 /
   查单个）共用同一个类型，区别只在填了哪些字段。两种答法形状真的不同
   （`jms_system_role_permissions`：不点名答角色清单、点名答权限路径），
   就让**行类型取并集**，并在 `note` 里写明这次答的是哪一种 ——
   契约声明着一种形状、答复给另一种，是比缺字段更坏的谎。
-- ⚠️ **组合答复类型**住在 `biz/jumpserver/model/jmsms/outputs.go`（手写）：
+- ⚠️ **组合答复类型**住在 `biz/model/jmsms/outputs.go`（手写）：
   诊断类工具的答复 = 共享的 `jms.Diagnosis`（用 `service.Diagnosis` 装配）
   + 该工具自己的语境字段。信封放不下的语境（列表类工具的「按类型分布」、
   「这是哪个角色」）写进 `note`，别塞进计数字段。
@@ -331,7 +352,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
   连通性报告丢了「`-` 状态」的资产 —— 都是当场发现、当场补进 IDL 的。
   一个被丢掉的字段，调用方看不到自己少知道了什么。
 - ⚠️ **工具层不许出现 API 路径字面量，也不许调裸传输**（`c.Do` / `c.ListAll`）。
-  有一道机械守卫盯着：`biz/jumpserver/handler/protocol_guard_test.go` 扫源码，违规就红。
+  有一道机械守卫盯着：`biz/handler/protocol_guard_test.go` 扫源码，违规就红。
   要访问堡垒机就去问**资源**（`jmsapi.ResPermissions` 等），网关负责拼 URL。
 
 ### 2.10 `biz/policy/policy.go` 是危险分级中枢
@@ -346,7 +367,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
 
 ### 2.11 委派凭据（Chat AI 委派）
 
-- `internal/jumpserver/client/delegation.go` + `biz/jumpserver/handler/delegation.go`：
+- `internal/repository/delegation.go` + `biz/handler/delegation.go`：
   **Chat AI 委派凭据**机制。一个凭据只授权一次调用（一个 method/path/query/body）、
   一次有效、60 秒内过期。它**不额外授权** —— 调用者仍走正常 RBAC。
   用它做「不想长期可达」的操作（删除、改权限）。
@@ -373,7 +394,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
 ## 3. 管理面专属铁律
 
 1. **工具数是 97，被测试钉住。**
-   `biz/jumpserver/router/policy_test.go` 的 `TestToolCount` 直接写死
+   `biz/router/policy_test.go` 的 `TestToolCount` 直接写死
    `if got := len(r.Specs()); got != 97` ⇒ 加一个工具**必须**改这个数（连同
    README 与 skills 里引用的数字）。⚠️ 这个数**是给 agent 的契约**，不是内部计数：
    「这个 server 给我哪些工具」变了，就是变了。
@@ -384,9 +405,9 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
    `gather` / `job` / `network` / `permission` / `rbac` / `records` / `refs` /
    `security` / `status` / `touch` / `user`（外加入口 `jmsms.thrift`）。
    ⚠️ **每一份**都声明 `namespace go jmsms` —— 拆的是文件，不是词汇。
-   ⚠️ 改了 IDL 要跑 `./script/gen-idl.sh` 重新生成 `biz/jumpserver/model/jmsms/`（产物入库）。
+   ⚠️ 改了 IDL 要跑 `./script/gen-idl.sh` 重新生成 `biz/model/jmsms/`（产物入库）。
    ⚠️ **契约类型写了没人产出 = 契约不存在** ——
-   `biz/jumpserver/model/jmsms/contract_test.go` 盯着（守卫身在 kit 的 `pkg/contractscan`）。
+   `biz/model/jmsms/contract_test.go` 盯着（守卫身在 kit 的 `pkg/contractscan`）。
 
 3. **doctor 的行为是契约。**
    - `jumpserver-mcp --doctor` 与 `jumpserver-mcp doctor` 等价；
@@ -428,7 +449,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
      只有假堡垒机能让两者分歧，所以黑盒那一格不可由前两种替代。
 
 5. **答复的脱敏走「同一件事的两半」的形状那一半。**
-   本仓的 `biz/jumpserver/handler/redact.go` 负责**形状**（保留键名与 scheme：
+   本仓的 `biz/handler/redact.go` 负责**形状**（保留键名与 scheme：
    `Authorization: Bearer [REDACTED]`、`{"password":"[REDACTED]"}`），
    **词表**在 kit 的 `pkg/redact.IsCredentialKey`（**只加那一份**）。
    ⚠️ **要加词就加 kit 那一份** —— 别往答复路径里另加一条词表：
@@ -450,11 +471,11 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
 | 编译 | `./script/build.sh` 无错（产物落在 `./bin/jumpserver-mcp`） |
 | 单元测试 | 同脚本内置 `go test ./...`，必须全绿（脚本会打印失败日志，不吞掉） |
 | 启动 | `./script/bootstrap.sh` 能起一个进程（stdio 上说 JSON-RPC） |
-| 工具数 | **97**（`biz/jumpserver/router/policy_test.go` 钉住） |
+| 工具数 | **97**（`biz/router/policy_test.go` 钉住） |
 | 目录一致 | 策略表与注册表必须一一对应（同上） |
-| 契约 | 契约类型必须真被产出（`biz/jumpserver/model/jmsms/contract_test.go`）；**答案本身必须是契约类型**（`internal/arch/answer_test.go`） |
+| 契约 | 契约类型必须真被产出（`biz/model/jmsms/contract_test.go`）；**答案本身必须是契约类型**（`internal/arch/management_test.go` 的 `TestTheAnswerTypesAreFoundMechanically`） |
 | 分层 | 底座不得依赖任何服务；不得 import 执行面；IDL/包/模型三名对齐（`internal/arch/`） |
-| 工具不许调裸传输 | `biz/jumpserver/handler/protocol_guard_test.go` 扫源码 |
+| 工具不许调裸传输 | `biz/handler/protocol_guard_test.go` 扫源码 |
 | 自检 | `./bin/jumpserver-mcp --doctor` 退出码 0 |
 | 真调 | 重启会话后实际调一次新工具；**重启前**可用 JSON-RPC 直接驱动已发布二进制（参考 `script/verify-mcp-launch.py`） |
 
@@ -504,7 +525,7 @@ schema 校验只在答案被返回时才跑，所以「编译过 + 单元测试�
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 怎么参与：跑测试、加工具的规矩、提交约定 |
 | [`SECURITY.md`](SECURITY.md) | 漏洞报告渠道、凭据处理纪律 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 变更记录（Keep a Changelog） |
-| [`biz/jumpserver/README.md`](biz/jumpserver/README.md) | 管理面细节 |
+| [`biz/README.md`](biz/README.md) | 管理面细节 |
 | [`skills/`](skills/) | **给 AI 的操作手册**（jumpserver-ops / jms-onboarding / jms-access-review） |
 | **kit 仓的 AGENTS.md** | <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md> —— **共享纪律**（铁律、底座怎么发版、跨仓守卫） |
 | **kit 仓的 ARCHITECTURE.md** | <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/docs/ARCHITECTURE.md> —— 三仓的边界与依赖方向 |

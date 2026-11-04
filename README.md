@@ -33,7 +33,7 @@ PrivateToken 在堡垒机上拿：v5 是 `设置 → API 授权`，v4 是 `用�
 
 ```bash
 # 方式一：go install（需要 Go 1.26+）
-go install github.com/yi-nology/jumpserver-mcp/cmd/jumpserver-mcp@latest
+go install github.com/yi-nology/jumpserver-mcp@latest
 
 # 方式二：release 二进制（见 Releases 页）
 curl -LO https://github.com/yi-nology/jumpserver-mcp/releases/latest/download/jumpserver-mcp-linux-amd64
@@ -147,27 +147,47 @@ client ⇒ 没有 `JUMPSERVER_TOKEN` 时它**不注册** ⇒ 执行面是 14 而
 
 ```
 .
-├── cmd/jumpserver-mcp/        ← 编译入口（serve / doctor / tools / version）
-├── biz/jumpserver/            ← 业务
-│   ├── handler/               ← 97 个工具的实现（一个域一个文件）
-│   ├── model/jmsms/           ← 输出契约的生成物（thriftgo，产物入库）
-│   ├── policy/                ← 工具目录的风险侧：改不改堡垒机、要不要 confirm
-│   ├── router/                ← 装配：哪个域注册哪些工具
-│   └── service/               ← 领域规则：纯函数，不碰网络，可离线单测
-├── conf/jumpserver/           ← 配置（环境变量 → 结构体）
-├── idl/jmsms/                 ← 输出契约的 thrift 定义（入口 + 按域拆的多份）
-├── internal/jumpserver/       ← 模块私有
-│   ├── client/                ← 领域仓储：堡垒机的资源
-│   ├── livetest/              ← 打真堡垒机的测试助手
-│   └── ...
-├── internal/arch/             ← 机械守卫（见下）
-├── script/                    ← 构建 / 发布 / 真机验证脚本
-├── skills/                    ← 给 AI agent 的操作手册（3 个 skill）
-├── docs/                      ← 配置与排障
-└── AGENTS.md                  ← 给 AI 的迭代指南（改代码前先读）
+├── main.go / init.go / server.go / workers.go / shutdown.go
+│                                ← 入口层（**仓根**的 package main）：serve / doctor / tools / version
+├── cmd/                        ← 子命令（入口层 import 的**普通包**，不是二进制）
+│   ├── serve/                  ← 默认命令：以 stdio 提供 MCP 服务
+│   ├── doctor/                 ← 自检：接线与堡垒机配置
+│   └── tools/                  ← 工具目录：名字、风险、确认要求
+├── biz/                        ← 业务
+│   ├── handler/                ← 97 个工具的实现（一个域一个文件）
+│   ├── model/jmsms/            ← 输出契约的生成物（thriftgo，产物入库）
+│   └── router/                 ← 装配：哪个域注册哪些工具
+├── internal/                   ← 模块私有
+│   ├── config/                 ← 配置（环境变量 → 结构体）
+│   ├── repository/             ← 数据访问层：堡垒机的资源
+│   │   └── livetest/           ← 打真堡垒机的测试助手
+│   ├── service/                ← 领域规则：纯函数，不碰网络，可离线单测
+│   │   └── policy/             ← 工具目录的风险侧：改不改堡垒机、要不要 confirm
+│   ├── arch/                   ← 机械守卫（见下）
+│   ├── middleware/             ← （空）HTTP 中间件：这一面没有 HTTP
+│   └── rpchandler/             ← （空）RPC 服务端：这一面不对外提供 RPC
+├── idl/jmsms/                  ← 输出契约的 thrift 定义（入口 + 按域拆的多份）
+├── pkg/                        ← （空）通用库在 kit 仓，不在这里放东西
+├── etc/ swagger/ deploy/ monitoring/ rpcx/ kitex_gen/
+│                                ← （空）hz 骨架里的其余层：见各目录里的 README
+├── script/                     ← 构建 / 发布 / 真机验证脚本
+├── skills/                     ← 给 AI agent 的操作手册（3 个 skill）
+├── docs/                       ← 配置与排障
+└── AGENTS.md                   ← 给 AI 的迭代指南（改代码前先读）
 ```
 
-目录按 **CloudWeGo hz 的标准骨架**摆（`cmd/` `biz/` `idl/` `model/` `conf/` `script/`）。
+目录按 **CloudWeGo hz 的标准骨架**摆（`cmd/` `biz/` `idl/` `internal/` `pkg/` `etc/` `script/`）。
+
+⚠️ **入口层在仓根**：一个仓一个二进制，二进制就是仓根那个 `package main` ⇒
+`go install github.com/yi-nology/jumpserver-mcp@latest` 装出来的就是它
+（**不是** `…/cmd/jumpserver-mcp@latest` —— 那个路径没有了）。
+
+⚠️ **`cmd/` 里是子命令，不是二进制**：那些包是入口层 import 的普通包。
+而**实现不住在仓根** —— 仓根那个 package 是 `main`，Go **不许 import 一个
+main 包** ⇒ 子命令的实现只能在 `cmd/` 下。
+
+⚠️ **空的层不是「忘了做」**：每一层都有自己的 README，写着它为什么空、
+什么时候不再是空的。
 
 ### 6.1 为什么是三个仓
 

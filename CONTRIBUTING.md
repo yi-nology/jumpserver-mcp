@@ -38,7 +38,7 @@ go vet ./...             # 静态检查
 | **声明输出形状**（`OutputSchema`） | 服务端在返回前按它校验，形状不对直接报错 |
 | **答案必须是契约类型**，不许手拼 map | 有机械守卫盯着（`internal/arch/answer_test.go`） |
 | **加工具要同步改 `skills/`** | 那里是 agent 选工具的依据，有检查会报脱节（`./script/check-skill-drift.sh`） |
-| **加工具要改工具数** | **97**，被 `biz/jumpserver/router/policy_test.go` 钉住 |
+| **加工具要改工具数** | **97**，被 `biz/router/policy_test.go` 钉住 |
 | **改了 IDL 要重新生成** | `./script/gen-idl.sh`，生成物入库 |
 | **别跑 `go mod tidy`** | 受限网络下会失败；手工同步 `go.mod` 的 `require` |
 | **别提交构建产物** | 产物落在 `./bin/`（发布后落在 `~/.local/jumpserver-mcp-runtime/<stamp>/`） |

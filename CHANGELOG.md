@@ -11,6 +11,38 @@
 
 ### 修复
 
+## [0.4.0] - 2026-11-04
+
+### 变更
+
+- ⚠️ **目录按 CloudWeGo hz 的标准骨架重排**：
+  - **入口层搬到仓根**：`main.go` / `init.go` / `server.go` /
+    `workers.go` / `shutdown.go` 是仓根那个 `package main`；
+  - **`cmd/` 改成放子命令**：`cmd/serve`、`cmd/doctor`、`cmd/tools`
+    是入口层 import 的**普通包**（不是各自的二进制）；
+  - **`biz/` 去掉服务名前缀**：`biz/jumpserver/` → `biz/`；
+  - **数据访问层统一叫 `internal/repository/`**：
+    `internal/jumpserver/client/` → `internal/repository/`；
+  - **配置挪到 `internal/config/`**（原 `conf/jumpserver/`），
+    包名 `conf` → `config`；
+  - **领域规则挪到 `internal/service/`**（原 `biz/jumpserver/service/`），
+    风险表在 `internal/service/policy/`；
+  - 补齐模板里的其余层（`pkg/`、`etc/`、`swagger/`、`deploy/`、
+    `monitoring/`、`internal/middleware/`、`internal/rpchandler/`、
+    `rpcx/`、`kitex_gen/`），**每一层都有自己的 README**，写着它为什么
+    空、什么时候不再是空的。
+
+- ⚠️ **`go install` 的路径变了**：
+  `go install github.com/yi-nology/jumpserver-mcp/cmd/jumpserver-mcp@latest`
+  ⇒ `go install github.com/yi-nology/jumpserver-mcp@latest`。
+  ⚠️ **旧路径不再存在** ⇒ 用旧命令装的人要改一次。
+  release 页的二进制下载**不受影响**。
+
+- ⚠️ **底座要求抬到 `jumpserver-mcp-kit v0.1.4`**：入口层的新布局要底座
+  的守卫认（新判据 + 新增的「一个仓一个二进制」守卫）。
+- 内部包名跟着改：`client` → `repository`（`repository.Client`），
+  `conf` → `config`（`config.Config`）。
+
 ## [0.3.3] - 2026-11-04
 
 ### 修复
@@ -36,7 +68,7 @@
   ⇒ 版本常量抬到 `0.3.2`，并加一道守卫（见下）。
 
 - **新增版本守卫**：二进制说的版本必须等于**它是从哪个 tag 构建出来的**
-  （`cmd/jumpserver-mcp/version_test.go`）。
+  （`version_test.go`）。
   ⇒ 在 **tag 触发**的 CI 里它有牙齿：忘了抬版本常量 ⇒ 发版构建当场红。
   ⇒ 在 main 上它**跳过**并说明原因 —— 否则「版本号先抬、tag 后打」这条正常
   流程会把自己的 CI 弄红，守卫就会被第一个被它烦到的人关掉。
@@ -59,8 +91,8 @@
 ### 修复
 
 - ⚠️ **`v0.3.0` 那个 tag 是坏的**（已删除）：它在 CI 还红的时候被打出来 ⇒
-  `.gitignore` 的 `coverage.*` 把同名**源码** `biz/jumpserver/handler/coverage.go`
-  吞掉 ⇒ 那个 tag 缺文件 ⇒ `go install github.com/yi-nology/jumpserver-mcp/cmd/jumpserver-mcp@v0.3.0`
+  `.gitignore` 的 `coverage.*` 把同名**源码** `biz/handler/coverage.go`
+  吞掉 ⇒ 那个 tag 缺文件 ⇒ `go install github.com/yi-nology/jumpserver-mcp@v0.3.0`
   **编译失败**。现在 `v0.3.1` 是第一个可用的 tag。
   ⇒ 三个仓的 CI 都加了 `on: push: tags` ⇒ **tag 也会跑 CI**，坏掉的 tag 会当场红。
 

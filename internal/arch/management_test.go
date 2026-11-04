@@ -30,19 +30,19 @@ import (
 // 本仓的判据。
 var (
 	// handlerDirs 是工具实现所在的目录：答复从那里交出来，参数也从那里来。
-	handlerDirs = []string{"biz/jumpserver/handler"}
+	handlerDirs = []string{"biz/handler"}
 
 	// contractModels 是**生成契约模型**的目录（thriftgo 的产物）。
 	//
 	// ⚠️ 一个词汇按 IDL 域拆成了若干文件，这里说的是它们**住在哪**。
-	contractModels = []string{"biz/jumpserver/model/jmsms"}
+	contractModels = []string{"biz/model/jmsms"}
 
 	// answerSources 是工具**声明答复形状**的目录：答复类型是从这里扫出来的
 	// （每个工具在它的 handler 里声明 render.Schema[...]）。
 	//
 	// ⚠️ 它与 handlerDirs 同源但不是同一件事：前者是「答复从哪儿交出来」，
 	// 后者是「答复的形状从哪儿**声明**出来」。
-	answerSources = []string{"biz/jumpserver/handler"}
+	answerSources = []string{"biz/handler"}
 
 	// credentialParameters 是本仓真的当成凭据的参数名。
 	//
@@ -67,7 +67,7 @@ var (
 	}
 
 	// versionPlanes 说本仓的配置目录在哪（按面说，不按目录名猜）。
-	versionPlanes = map[string]string{"management plane": "conf/jumpserver"}
+	versionPlanes = map[string]string{"management plane": "internal/config"}
 
 	// versionSettings 是本仓读的版本设置。
 	//
@@ -111,9 +111,23 @@ func TestNoBareGoroutines(t *testing.T) {
 }
 
 // TestTheBinariesAreTheOutermostLayer 让入口层不要变成一个别人依赖的库。
+//
+// ⚠️ 入口层在**仓根**（main.go / init.go / server.go / workers.go /
+// shutdown.go 那个 package main），子命令的实现在 cmd/ 下 ⇒ 「最外层」
+// 是仓根与 cmd/ 两处，它们只许向里叫。
 func TestTheBinariesAreTheOutermostLayer(t *testing.T) {
 	tree := managementTree(t)
 	arch.CheckBinariesAreOutermost(t, tree.Root, tree.ModulePath)
+}
+
+// TestTheEntryLayerIsOneBinaryAtTheRoot 让「一个仓一个二进制」这件事是
+// 机械地成立的。
+//
+// ⚠️ 入口层搬到仓根之后，二进制就在仓根 ⇒ 子命令必须是**入口层 import
+// 的包**，不是各自的二进制 ⇒ 否则仓里就有了第二个入口，而发版只发一个。
+func TestTheEntryLayerIsOneBinaryAtTheRoot(t *testing.T) {
+	tree := managementTree(t)
+	arch.CheckTheEntryLayerIsOneBinaryAtTheRoot(t, tree.Root, tree.ModulePath)
 }
 
 // TestTheContractVocabularyIsNamedTheSameEverywhere 让 IDL、生成包与模型
@@ -222,7 +236,10 @@ func TestTheDependenciesArePinned(t *testing.T) {
 // logging the same fields.
 func TestThisServiceKeepsTheToolCallTrail(t *testing.T) {
 	root := managementRoot(t)
-	entry := filepath.Join(root, "cmd/jumpserver-mcp/root.go")
+	// ⚠️ 留痕接在**跑服务那条路**上（cmd/serve/），而它不在仓根：
+	// 仓根那个 package 是 main，Go 不许 import 一个 main 包 ⇒ 子命令的
+	// 实现只能住在 cmd/ 下。
+	entry := filepath.Join(root, "cmd/serve/serve.go")
 	body, err := os.ReadFile(entry)
 	if err != nil {
 		t.Fatalf("read %s: %v", entry, err)

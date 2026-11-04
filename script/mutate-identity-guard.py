@@ -44,12 +44,12 @@ import sys
 # unmutated code -- which looks exactly like "all the guards are fake".
 ROOT = os.path.realpath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.realpath("/tmp/jms-mutants-identity")
-PKG = "./biz/jumpserver/handler/"
+PKG = "./biz/handler/"
 
 MUTATIONS = [
     {
         "id": "status-claims-accepted",
-        "file": "biz/jumpserver/handler/status.go",
+        "file": "biz/handler/status.go",
         "old": """				out.AuthOk = false
 				out.Error = jms.Opt(idErr.Error() + " (could not reach the bastion; this is NOT a verdict " +
 					"on the credential — the token was never tested)")""",
@@ -60,7 +60,7 @@ MUTATIONS = [
     },
     {
         "id": "doctor-fabricates-identity",
-        "file": "biz/jumpserver/handler/onboarding.go",
+        "file": "biz/handler/onboarding.go",
         "old": """		res.Identity = jmsms.IdentityRef{}
 		add("identity", service.Warn, "could not determine who the credential acts as: "+idErr.Error(),
 			"the identity comes from /users/profile/; the report does not guess it from a user list")""",
@@ -71,7 +71,7 @@ MUTATIONS = [
     },
     {
         "id": "acl-cannot-clear",
-        "file": "biz/jumpserver/handler/acl.go",
+        "file": "biz/handler/acl.go",
         "old": "if args.Comment != nil {",
         "new": 'if args.Comment != nil && *args.Comment != "" {',
         "all": True,
@@ -82,7 +82,7 @@ MUTATIONS = [
     },
     {
         "id": "empty-username-is-success",
-        "file": "biz/jumpserver/handler/identity.go",
+        "file": "biz/handler/identity.go",
         "old": """	who = jmsapi.Str(u["username"])
 	if who == "" {
 		return "", "", false, fmt.Errorf("identity probe: the answer carried no username")
@@ -93,7 +93,7 @@ MUTATIONS = [
     },
     {
         "id": "rbac-merges-scopes",
-        "file": "biz/jumpserver/handler/rbac.go",
+        "file": "biz/handler/rbac.go",
         "old": 'holder := rr.name + "@" + rr.scope',
         "new": "holder := rr.name",
         "tests": "TestRBACRoleMatrixKeepsSameNameRolesFromDifferentScopesDistinct",
@@ -101,7 +101,7 @@ MUTATIONS = [
     },
     {
         "id": "401-counted-as-ok",
-        "file": "biz/jumpserver/handler/status.go",
+        "file": "biz/handler/status.go",
         "old": """			case errs.Class(err) == toolfail.ClassAuthentication:
 				out.AuthOk = false""",
         "new": """			case errs.Class(err) == toolfail.ClassAuthentication:
