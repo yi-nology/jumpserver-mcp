@@ -7,7 +7,7 @@ package handler
 // somebody typed -- and the output lands in an AI context window, a terminal
 // scrollback and a session recording of its own. The first version of
 // jms_asset_evidence did exactly that: asking it about a machine returned
-// "PrivateKey = EMrb0obFo0sJqh6KjNz9WThsO9gh4P1Lrk0/1SgcXno=" verbatim.
+// "PrivateKey = EMrb0obFo0sJqh6KjNz9WThsO9gh4P1Lrk0/1SgcXno=" verbatim. // jms:allow-credential
 //
 // What is masked is the VALUE, never the command. "cat /etc/wireguard/wg0.conf"
 // is exactly the kind of thing an audit wants to show; the key next to it is

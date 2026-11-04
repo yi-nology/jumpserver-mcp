@@ -11,7 +11,7 @@ import (
 // "cat /etc/wireguard/wg0.conf" is exactly what an audit wants to show.
 func TestRedactSecretsMasksValues(t *testing.T) {
 	cases := []struct{ in, secret, readable string }{
-		{"PrivateKey = EMrb0obFo0sJqh6KjNz9WThsO9gh4P1Lrk0/1SgcXno=",
+		{"PrivateKey = EMrb0obFo0sJqh6KjNz9WThsO9gh4P1Lrk0/1SgcXno=", // jms:allow-credential
 			"EMrb0obFo0sJqh6KjNz9WThsO9gh4P1Lrk0/1SgcXno=", "PrivateKey"},
 		{"password = hunter2", "hunter2", "password"},
 		{"token: abc123XYZ", "abc123XYZ", "token"},
