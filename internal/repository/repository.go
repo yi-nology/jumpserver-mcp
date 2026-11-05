@@ -26,9 +26,14 @@ import (
 
 // Client is the management plane's view of the bastion.
 //
-// The protocol client is embedded, so Do, ListAll and the rest are the shared
-// ones — there is exactly one implementation of "how to call the bastion" in
-// this repository.
+// The protocol client is embedded, so Do and the rest are the shared ones —
+// there is exactly one implementation of "how to call the bastion" in this
+// repository. LISTING goes through the gateway's resource shapes even here
+// (List / ListQuery / ListCounted / ListSub / ListSubQuery): the raw path
+// forms exist on the embedded client, but a caller-written path is exactly
+// what the tool-layer guard exists to catch one floor up — this layer does
+// not get to be casual about it either. Raw Do is for endpoints with no
+// gateway shape (bespoke actions, the label full-set PUT).
 type Client struct {
 	*jmsapi.Client
 

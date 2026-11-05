@@ -67,11 +67,9 @@ func (c *Client) LoadNodeTree(ctx context.Context) (*NodeTree, error) {
 }
 
 func (c *Client) AssetsUnderNode(ctx context.Context, nodeID string) ([]map[string]any, error) {
-	rows, err := c.ListAll(ctx, string(jmsapi.ResNodes)+nodeID+"/assets/")
-	if err != nil {
-		return nil, err
-	}
-	return rows, nil
+	// The gateway shape, not a path built here: listing speaks resources
+	// even in this layer — raw paths are for endpoints with no gateway shape.
+	return c.ListSub(ctx, jmsapi.ResNodes, nodeID, "assets")
 }
 
 // Descendants lists the node itself and everything filed below it.

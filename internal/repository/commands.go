@@ -33,11 +33,10 @@ func (c *Client) FetchCommands(ctx context.Context, q url.Values) ([]CommandReco
 	// listAll, not a single page_size request: the endpoint ignores
 	// page_size above its own cap of 200 rows, so a one-shot read returns
 	// only the newest 200 commands and silently truncates the audit trail.
-	path := string(jmsapi.ResTerminalCommands)
-	if len(q) > 0 {
-		path += "?" + q.Encode()
-	}
-	rows, err := c.ListAll(ctx, path)
+	// The query goes as a query, not concatenated onto the path: the gateway
+	// shape exists (ListQuery), and a caller-written "?a=1" on a path is
+	// exactly what the tool-layer guard exists to catch one floor up.
+	rows, err := c.ListQuery(ctx, jmsapi.ResTerminalCommands, q)
 	if err != nil {
 		return nil, err
 	}

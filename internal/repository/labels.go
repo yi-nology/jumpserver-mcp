@@ -121,8 +121,11 @@ func (c *Client) LabelAttach(ctx context.Context, labelID string, ctID int, add,
 // It is the "bound=1" view: the resources that actually carry the label,
 // as opposed to every resource of that content type.
 func (c *Client) LabelBoundIDs(ctx context.Context, labelID string, ctID int) ([]string, error) {
-	path := labelResourcePath(labelID, ctID)
-	rows, err := c.ListAll(ctx, path+"?bound=1&page_size=500")
+	// The "bound=1" view as a query on the gateway's sub-resource shape —
+	// not a query string concatenated onto a path built here.
+	rows, err := c.ListSubQuery(ctx, jmsapi.ResLabels, labelID,
+		fmt.Sprintf("resource-types/%d/resources", ctID),
+		url.Values{"bound": {"1"}, "page_size": {"500"}})
 	if err != nil {
 		return nil, err
 	}
