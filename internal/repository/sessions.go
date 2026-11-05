@@ -7,12 +7,12 @@ package repository
 
 import (
 	"archive/tar"
-	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 
@@ -61,15 +61,34 @@ func (c *Client) DownloadReplayText(ctx context.Context, sessionID string) (stri
 	// here sent "Token " with an EMPTY key under a login credential (v4's
 	// only option), and the 401 that came back was read as a tar stream and
 	// reported "unexpected EOF" instead of a refused credential.
-	raw, err := c.GetBinary(ctx, string(jmsapi.ResSessions)+sessionID+"/replay/download/")
+	//
+	// STREAMED TO DISK, not held in memory: a long session's replay archive
+	// reaches gigabytes, and evidence pulls run several of them in one tool
+	// call — GetBinary would hold every one of them (plus the tar and cast
+	// copies on top) in RAM at once. GetBinaryTo pipes the body straight
+	// into a scratch file, deleted when this function returns; only the
+	// (compressed-then-text) cast member inside is ever read whole.
+	tmp, err := os.CreateTemp("", "jms-replay-*.tar")
 	if err != nil {
+		return "", fmt.Errorf("scratch file for replay: %w", err)
+	}
+	path := tmp.Name()
+	defer func() { _ = tmp.Close(); _ = os.Remove(path) }()
+	if _, err := c.GetBinaryTo(ctx, string(jmsapi.ResSessions)+sessionID+"/replay/download/", tmp); err != nil {
 		return "", err
 	}
-	return CastToText(raw)
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+		return "", err
+	}
+	return castTextFromFile(tmp)
 }
 
-func CastToText(tarBytes []byte) (string, error) {
-	tr := tar.NewReader(bytes.NewReader(tarBytes))
+// castTextFromFile walks a replay tar already on disk and returns the text
+// of its .cast.gz member. The tar itself is streamed from the file; the
+// cast member is decompressed streaming and read whole only at the text
+// conversion, where the input is JSON lines a fraction of the archive size.
+func castTextFromFile(f *os.File) (string, error) {
+	tr := tar.NewReader(f)
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -81,16 +100,12 @@ func CastToText(tarBytes []byte) (string, error) {
 		if !strings.HasSuffix(hdr.Name, ".cast.gz") {
 			continue
 		}
-		gz, err := io.ReadAll(tr)
-		if err != nil {
-			return "", fmt.Errorf("read cast: %w", err)
-		}
-		zr, err := gzip.NewReader(bytes.NewReader(gz))
+		zr, err := gzip.NewReader(tr)
 		if err != nil {
 			return "", fmt.Errorf("gunzip cast: %w", err)
 		}
-		defer zr.Close()
 		raw, err := io.ReadAll(zr)
+		_ = zr.Close()
 		if err != nil {
 			return "", fmt.Errorf("read cast body: %w", err)
 		}
