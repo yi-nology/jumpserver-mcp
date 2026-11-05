@@ -389,7 +389,7 @@ func RegisterSecurityReview(r *reg.Registry, c *repository.Client) {
 			checks = append(checks, &jms.Check{
 				Name: "repeat_failed_logins", Status: service.Warn,
 				Detail: "the Block IP list could not be read, so whether the offending addresses are blocked is UNKNOWN — they are listed with blocked=false, which means \"not on the list we could not read\", not \"unblocked\"",
-				Fix: service.FixText("grant the credential read access to the block list, then re-run; until then check the addresses by hand"),
+				Fix:    service.FixText("grant the credential read access to the block list, then re-run; until then check the addresses by hand"),
 			})
 		case len(unblocked) > 0:
 			checks = append(checks, &jms.Check{
