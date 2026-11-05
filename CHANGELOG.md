@@ -11,6 +11,16 @@
 
 ### 修复
 
+## [0.12.0] - 2026-11-06
+
+### 变更
+
+- 底座抬 v0.8.1（网关 `ListSubQuery`）。
+- **仓层 listing 全部收编进网关**：`internal/repository` 的 3 处裸 `ListAll`
+  （nodes→`ListSub` / commands→`ListQuery` / labels→`ListSubQuery`）不再手写
+  路径与查询串。守卫边界刻意不扩到本层——repository 是协议层本体，裸 `Do`
+  留给无网关形状的端点（分工写进了 `repository.go` 类型注释）。
+
 ## [0.11.0] - 2026-11-05
 
 ### 变更
