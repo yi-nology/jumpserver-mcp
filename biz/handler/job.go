@@ -89,20 +89,18 @@ func RegisterJobTools(r *reg.Registry, c *repository.Client) {
 		// spellings of one contract drift.
 		would, blocked := risk.Rehearsal(cmdClass, args.Confirm)
 		if args.DryRun {
-			plan.Executed = jms.OptBool(false)
-			plan.WouldExecute = jms.OptBool(would)
-			if blocked != "" {
-				// ⚠️ The trail knows this is not a refusal: a rehearsal
-				// that carries a `blocked` hint is still a rehearsal,
-				// and the trail tells the two apart (see pkg/audit).
-				plan.Blocked = jms.Opt(blocked)
-			}
-			plan.Note = jms.Opt("dry run: nothing was executed")
+			// The verdict vocabulary (executed / would_execute / blocked /
+			// note) is filled by the shared writer, so this plane's
+			// rehearsal says what the execution plane's says.
+			//
+			// ⚠️ The trail knows this is not a refusal: a rehearsal that
+			// carries a `blocked` hint is still a rehearsal, and the trail
+			// tells the two apart (see pkg/audit).
+			render.FillRehearsal(plan, cmdClass.String(), would, blocked, render.RehearsalNote)
 			return render.Text(plan)
 		}
 		if !would {
-			plan.Executed = jms.OptBool(false)
-			plan.Blocked = jms.Opt(blocked)
+			render.FillRefusal(plan, cmdClass.String(), blocked)
 			return render.Text(plan)
 		}
 

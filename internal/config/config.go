@@ -17,10 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oekit/core/config"
-
 	"github.com/yi-nology/jumpserver-kit/pkg/audit"
-	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/confload"
 )
 
 // Config is the effective configuration of the management-plane server.
@@ -167,14 +165,8 @@ func (c *Config) AuditSettings() audit.Settings {
 // finds both.
 func Load() (*Config, error) {
 	cfg := &Config{}
-	if err := config.ApplyEnv(cfg); err != nil {
-		return nil, fmt.Errorf("read configuration: %w", err)
-	}
-	if err := config.FillDefaults(cfg); err != nil {
-		return nil, fmt.Errorf("apply configuration defaults: %w", err)
-	}
-	if err := config.ValidateTags(cfg); err != nil {
-		return nil, fmt.Errorf("validate configuration: %w", err)
+	if err := confload.FromEnv(cfg); err != nil {
+		return nil, err
 	}
 
 	cfg.BaseURL = strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
@@ -189,37 +181,33 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("JUMPSERVER_URL is required: the root of your JumpServer deployment, " +
 			"e.g. https://jumpserver.example.com (no trailing /api/v1)")
 	}
-	if cfg.HTTPAddr != "" && cfg.HTTPToken == "" {
-		return nil, fmt.Errorf("JMS_HTTP_ADDR is set but JMS_HTTP_TOKEN is not: the HTTP surface answers " +
-			"tool calls, so it needs a bearer token. Generate one (openssl rand -hex 32) and set " +
-			"JMS_HTTP_TOKEN, or unset JMS_HTTP_ADDR to stay on stdio only")
+	if err := confload.HTTPFaceNeedsToken(cfg.HTTPAddr, cfg.HTTPToken); err != nil {
+		return nil, err
 	}
-	if cfg.RPCAddr != "" && cfg.RPCToken == "" {
-		return nil, fmt.Errorf("JMS_RPC_ADDR is set but JMS_RPC_TOKEN is not: the RPC face answers " +
-			"tool calls to whoever can reach the port, and there is no auth-off mode")
+	if err := confload.RPCFaceNeedsToken(cfg.RPCAddr, cfg.RPCToken); err != nil {
+		return nil, err
 	}
 	if cfg.Token == "" && cfg.Username == "" {
 		return nil, fmt.Errorf("a credential is required: JUMPSERVER_TOKEN (a JumpServer PrivateToken) " +
 			"or JUMPSERVER_USERNAME together with JUMPSERVER_PASSWORD")
 	}
-	if cfg.Token == "" {
-		// The password may live in a file instead of the environment: the
-		// environment of a long-running process is readable by anything
-		// that can read /proc on Linux, and an MCP server is started by an
-		// agent runtime whose environment is not a secret store.
-		pw, err := jmsapi.LoadPassword()
-		if err != nil {
-			return nil, fmt.Errorf("JUMPSERVER_USERNAME is set but the password is missing: %w", err)
-		}
+	// The password may live in a file instead of the environment: the
+	// environment of a long-running process is readable by anything that
+	// can read /proc on Linux, and an MCP server is started by an agent
+	// runtime whose environment is not a secret store. The TOTP secret is
+	// optional: a deployment without MFA never asks for one.
+	//
+	// (The credential-required check above guarantees a username is present
+	// when the token is not, which is the condition LoginSecrets reads by.)
+	pw, otp, err := confload.LoginSecrets(cfg.Token, cfg.Username, cfg.OTP)
+	if err != nil {
+		return nil, err
+	}
+	if pw != "" {
 		cfg.Password = pw
 	}
-	if cfg.OTP == "" {
-		// The TOTP secret is optional: a deployment without MFA never
-		// asks for one. It is only read when the deployment DOES ask, so
-		// its absence is not an error here.
-		if otp, err := jmsapi.LoadOTPSecret(); err == nil {
-			cfg.OTP = otp
-		}
+	if otp != "" {
+		cfg.OTP = otp
 	}
 	return cfg, nil
 }
