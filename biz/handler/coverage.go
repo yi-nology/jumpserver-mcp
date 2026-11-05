@@ -29,11 +29,13 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/oekit/concurrency/fanout"
 	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
@@ -176,23 +178,53 @@ func RegisterCoverageTools(r *reg.Registry, c *repository.Client) {
 		// limit=N answered "N users in the endpoint's order, sorted among
 		// themselves" -- and reported that count as the total, with
 		// truncated stuck at false.
-		reach := map[string][]map[string]any{}
+		//
+		// One ListSub per user is an N-call shape; serially that is N REST
+		// round-trips -- on a few-hundred-user deployment, minutes of
+		// wall-clock against the bastion's rate limiter, crowding out the
+		// quota every other tool on the same credential shares. Fetch them
+		// through a bounded worker pool instead: the gateway's limiter
+		// still paces each individual call, but the pool keeps the
+		// pipeline full instead of paying one round-trip's latency per
+		// user. Failures are collected, not swallowed: the note reports
+		// how many users' reach could not be read, so a half-answered
+		// matrix is visible rather than silent.
+		var candidates []map[string]any
 		for _, u := range users {
-			username := jmsapi.Str(u["username"])
 			// Component accounts such as [KoKo]-... are internal plumbing.
-			if strings.HasPrefix(username, "[") {
+			if strings.HasPrefix(jmsapi.Str(u["username"]), "[") {
 				continue
 			}
-			uid := jmsapi.Str(u["id"])
-			rows, err := c.ListSub(ctx, jmsapi.ResPermUserAssets, uid, "assets")
-			if err != nil {
-				continue
+			candidates = append(candidates, u)
+		}
+		const reachConcurrency = 4
+		reaches, fanErr := fanout.Map(ctx, candidates, reachConcurrency,
+			func(ctx context.Context, u map[string]any) ([]map[string]any, error) {
+				return c.ListSub(ctx, jmsapi.ResPermUserAssets, jmsapi.Str(u["id"]), "assets")
+			})
+		failed := map[int]bool{}
+		var fanErrs *fanout.Error
+		if errors.As(fanErr, &fanErrs) {
+			for _, fe := range fanErrs.Failed {
+				failed[fe.Index] = true
 			}
-			reach[uid] = rows
+		}
+		reach := map[string][]map[string]any{}
+		for i, rows := range reaches {
+			if failed[i] {
+				continue // same skip the serial loop did, now counted
+			}
+			reach[jmsapi.Str(candidates[i]["id"])] = rows
 		}
 		// filter → map → sort → truncate → count: render.ListSpec owns the
 		// order and the three counting fields; total is how many users the
 		// matrix resolved, before the cap.
+		note := fmt.Sprintf("sorted by reach, widest first; %d user(s) checked at concurrency %d; this is the view to start an access review from",
+			len(candidates), reachConcurrency)
+		if len(failed) > 0 {
+			note += fmt.Sprintf("; %d user(s)' reach could not be read and are OMITTED from this matrix",
+				len(failed))
+		}
 		return render.Text(render.ListSpec[map[string]any, jmsms.AccessMatrixUser]{
 			Rows: users,
 			Keep: func(u map[string]any) bool {
@@ -223,7 +255,7 @@ func RegisterCoverageTools(r *reg.Registry, c *repository.Client) {
 			Limit: args.Limit,
 			Def:   50,
 			Max:   200,
-			Note:  "sorted by reach, widest first; this is the view to start an access review from",
+			Note:  note,
 		}.Build())
 	})
 }

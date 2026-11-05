@@ -82,14 +82,7 @@ func (c *Client) ContentTypeID(ctx context.Context, model string) (int, error) {
 		model, strings.Join(models, ", "))
 }
 
-// labelResourcePath is the endpoint that lists the resources a label covers.
-func labelResourcePath(labelID string, contentTypeID int) string {
-	return fmt.Sprintf("%s%s/resource-types/%d/resources/", string(jmsapi.ResLabels), labelID, contentTypeID)
-}
-
 func (c *Client) LabelAttach(ctx context.Context, labelID string, ctID int, add, remove []string) (string, error) {
-	path := labelResourcePath(labelID, ctID)
-
 	cur, err := c.LabelBoundIDs(ctx, labelID, ctID)
 	if err != nil {
 		return "", err
@@ -108,9 +101,15 @@ func (c *Client) LabelAttach(ctx context.Context, labelID string, ctID int, add,
 	want := slices.Collect(maps.Keys(desired))
 	sort.Strings(want)
 
+	// The gateway's Put shape, not a path built here: the sub-resource PUT
+	// has a gateway form (Put(res, id, sub, ...) — the same shape Put has
+	// served for a user's password and a node's assets), and this endpoint
+	// fits it exactly. The raw-path Do this used to be was the write-side
+	// leak the listing side had already been closed on.
 	body := map[string]any{"res_ids": want}
 	var out map[string]any
-	if err := c.Do(ctx, "PUT", path, nil, body, &out); err != nil {
+	if err := c.Put(ctx, jmsapi.ResLabels, labelID,
+		fmt.Sprintf("resource-types/%d/resources", ctID), body, &out); err != nil {
 		return "", fmt.Errorf("attach failed: %w", err)
 	}
 	return fmt.Sprintf("%d resource(s) now carry the label (was %d)", len(want), before), nil
@@ -122,7 +121,10 @@ func (c *Client) LabelAttach(ctx context.Context, labelID string, ctID int, add,
 // as opposed to every resource of that content type.
 func (c *Client) LabelBoundIDs(ctx context.Context, labelID string, ctID int) ([]string, error) {
 	// The "bound=1" view as a query on the gateway's sub-resource shape —
-	// not a query string concatenated onto a path built here.
+	// not a query string concatenated onto a path built here. The page_size
+	// here is a wish, not a promise: the walk owns the paging (it sets its
+	// own limit/page_size so it terminates on a clamped page) — pinned in
+	// mappings_test.go.
 	rows, err := c.ListSubQuery(ctx, jmsapi.ResLabels, labelID,
 		fmt.Sprintf("resource-types/%d/resources", ctID),
 		url.Values{"bound": {"1"}, "page_size": {"500"}})

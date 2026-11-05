@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/oekit/pkg/convert"
@@ -80,9 +81,25 @@ func (c *Client) GatherAdhoc(ctx context.Context, assetID string) (string, error
 	// The report is HTML, not JSON, so it goes through the binary fetch —
 	// same reason as DownloadReplayText: the credential's own header, and a
 	// refused credential reported as itself.
-	raw, err := c.GetBinary(ctx, string(jmsapi.ResGatherAdhoc)+"?asset_id="+assetID)
+	//
+	// Streamed through a scratch file rather than held as one []byte: the
+	// report size is not bounded by the API, and pulls run alongside the
+	// evidence replay downloads — one less whole-body buffer in RAM when
+	// several run together. HTMLToText needs the whole document anyway, so
+	// the file is read back in one go; the win is the transfer never
+	// doubles the peak.
+	tmp, err := os.CreateTemp("", "jms-gather-*.html")
 	if err != nil {
+		return "", fmt.Errorf("scratch file for gather report: %w", err)
+	}
+	path := tmp.Name()
+	defer func() { _ = tmp.Close(); _ = os.Remove(path) }()
+	if _, err := c.GetBinaryTo(ctx, string(jmsapi.ResGatherAdhoc)+"?asset_id="+url.QueryEscape(assetID), tmp); err != nil {
 		return "", err
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read gather report: %w", err)
 	}
 	return jmsapi.HTMLToText(raw), nil
 }
