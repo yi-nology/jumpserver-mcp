@@ -431,6 +431,48 @@ CLI 上看到的 `[OK]/[WARN]/[FAIL]` 就是每项 check 的 `status`。
 
 ## 6. 工具选择速查
 
+<!-- tools:mgmt（机械守卫核对本块集合与注册表一致；见 jumpserver-kit script/check_tool_docs.py。加/改名/删工具时本块与 policy 同步改——守卫红就是提醒） -->
+
+**全部 97 个工具（机械生成的完整索引）：**
+
+```
+`jms_access_matrix`  `jms_account_automation_create`  `jms_account_automation_executions`
+`jms_account_automation_records`  `jms_account_automation_run`  `jms_account_automations_list`
+`jms_account_create`  `jms_account_delete`  `jms_account_update`
+`jms_accounts_list`  `jms_asset_audit`  `jms_asset_create`
+`jms_asset_delete`  `jms_asset_evidence`  `jms_asset_get`
+`jms_asset_move`  `jms_asset_touch_history`  `jms_asset_update`
+`jms_assets_bulk_create`  `jms_assets_list`  `jms_clipboard_acl_create`
+`jms_clipboard_acl_delete`  `jms_clipboard_acl_update`  `jms_clipboard_acls`
+`jms_cmdfilter_create`  `jms_cmdfilter_delete`  `jms_cmdfilter_list`
+`jms_cmdgroup_create`  `jms_cmdgroup_delete`  `jms_cmdgroup_list`
+`jms_command_audit`  `jms_command_guard`  `jms_commands_search`
+`jms_connectivity_check`  `jms_data_masking_rule_create`  `jms_data_masking_rule_delete`
+`jms_data_masking_rule_update`  `jms_data_masking_rules`  `jms_delegation_call`
+`jms_delegation_probe`  `jms_delegation_status`  `jms_doctor`
+`jms_file_transfers`  `jms_gather_apply`  `jms_gather_run`
+`jms_gathered_accounts`  `jms_job_audit`  `jms_job_list`
+`jms_job_run`  `jms_job_status`  `jms_job_stop`
+`jms_label_attach`  `jms_label_create`  `jms_label_delete`
+`jms_label_resources`  `jms_labels_list`  `jms_login_acl_create`
+`jms_login_acl_delete`  `jms_login_acl_update`  `jms_login_asset_check`
+`jms_login_logs`  `jms_net_gateways_list`  `jms_net_path`
+`jms_net_zones_list`  `jms_nodes_create`  `jms_nodes_list`
+`jms_operate_logs`  `jms_password_change_logs`  `jms_permission_compare`
+`jms_permission_coverage`  `jms_permission_create`  `jms_permission_delete`
+`jms_permission_get`  `jms_permission_grant`  `jms_permissions_list`
+`jms_platforms_list`  `jms_rbac_permissions`  `jms_rbac_role_matrix`
+`jms_role_permissions`  `jms_roles_list`  `jms_security_review`
+`jms_session_replay`  `jms_session_terminate`  `jms_session_transcript`
+`jms_sessions_list`  `jms_sessions_live`  `jms_status`
+`jms_system_role_permissions`  `jms_terminals_list`  `jms_user_access`
+`jms_user_create`  `jms_user_groups_list`  `jms_user_password_set`
+`jms_user_set_active`  `jms_user_sshkey_add`  `jms_user_sshkey_remove`
+`jms_users_list`
+```
+
+<!-- /tools:mgmt -->
+
 ### 6.1 维护堡垒机
 
 ```
