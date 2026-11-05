@@ -15,7 +15,7 @@ JumpServer **v5.0** 堡垒机的精简 MCP（Model Context Protocol）工具集�
 本仓暴露 **97 个**经过挑选的工具：只读/审计、批量作业、以及一批带 confirm 闸门的写操作
 （**准确**的清单与每个工具的风险见 `jumpserver-mgmt tools`）。
 
-工具的返回契约由 `idl/jmsms/` 定义（入口 `jmsms.thrift` include 各域文件；
+工具的返回契约由 `idl/`（摊平布局）定义（入口 `jmsms.thrift` include 各域文件；
 诊断报告 / 列表元信息 / 工具声明 / 失败），生成物在 `biz/model/jmsms/`；工具的风险与确认要求集中在
 `internal/service/policy/policy.go`，门禁在底座仓（kit）的 `pkg/reg/` —— 那是**唯一**的注册入口，
 所以「写操作必须 confirm」是结构性的，不是每个处理器自觉遵守的约定。
@@ -34,10 +34,10 @@ internal/repository/         ← JumpServer REST API 客户端 + 委派凭据
 internal/repository/livetest/← 打真堡垒机的测试助手
 internal/service/            ← 领域规则（纯函数）
 internal/service/policy/     ← 工具目录的风险侧
-idl/jmsms/                   ← 输出契约（thrift）
+idl/                         ← 输出契约（thrift，摊平布局）
 ```
 
-契约词汇是这一面自己的（`idl/jmsms/` → `biz/model/jmsms/`），
+契约词汇是这一面自己的（`idl/` → `biz/model/jmsms/`），
 这一面的代码都依赖它；门禁与协议层在**共用底座**（kit 仓）：`pkg/reg`、`pkg/jmsapi`、
 `pkg/audit`、`pkg/redact`、`pkg/render`、`model/jms`。
 

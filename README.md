@@ -117,7 +117,7 @@ jumpserver-mgmt --doctor   # 接线 + 堡垒机配置体检
 
 它回答的是「**这个堡垒机现在是什么样子、谁能干什么**」。
 
-契约按域拆成 17 份 thrift（`idl/jmsms/`），每个域一个文件：
+契约按域拆成 17 份 thrift（`idl/`，摊平布局），每个域一个文件：
 
 | 域 | 管什么 |
 |---|---|
@@ -205,7 +205,7 @@ client ⇒ 没有 `JUMPSERVER_TOKEN` 时它**不注册** ⇒ 执行面是 14 而
 │   ├── arch/                   ← 机械守卫（见下）
 │   ├── middleware/             ← （空）HTTP 中间件：HTTP 面的认证与路由在底座 pkg/httpapi
 │   └── rpchandler/             ← （空）RPC 服务端：这一面不对外提供 RPC
-├── idl/jmsms/                  ← 输出契约的 thrift 定义（入口 + 按域拆的多份）
+├── idl/                        ← 输出契约的 thrift 定义（摊平：入口 jmsms.thrift + 按域拆的多份）
 ├── pkg/                        ← （空）通用库在 kit 仓，不在这里放东西
 ├── swagger/                    ← HTTP 面的 OpenAPI（生成物：`tools openapi`，守卫逐字节比对）
 ├── etc/ deploy/ monitoring/ rpcx/ kitex_gen/

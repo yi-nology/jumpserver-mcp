@@ -49,7 +49,7 @@ internal/
 ├── arch/                   # 机械守卫（判据；守卫体在 kit 的 pkg/arch）
 ├── middleware/             # （空）HTTP 中间件：HTTP 面的认证与路由在底座 pkg/httpapi
 └── rpchandler/             # （空）RPC 服务端：这一面不对外提供 RPC
-idl/jmsms/                  # 契约的 thrift 定义：入口 jmsms.thrift + 按域拆的多份
+idl/                        # 契约的 thrift 定义（摊平布局）：入口 jmsms.thrift + 按域拆的多份
 pkg/                        # （空）通用库在 kit 仓，不在这里放东西
 swagger/                    # HTTP 面的 OpenAPI（生成物：tools openapi，守卫逐字节比对）
 etc/ deploy/ monitoring/ rpcx/ kitex_gen/
@@ -76,8 +76,10 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：HTTP 面的路�
 **分层的方向是硬的，有守卫盯着**（判据在本仓 `internal/arch/`，守卫体在 kit 的 `pkg/arch`）：
 - **本仓不得 import 执行面**（另一个服务）；**底座不得依赖任何服务**。
 - **入口层（仓根 + `cmd/`）是最外层，谁都不许 import**。
-- **IDL 目录名 == 生成包名 == 模型目录名**：`idl/jmsms/` 生成的包必须叫 `jmsms`，
-  放在叫 `jmsms` 的目录里。契约按域拆成同目录多份 thrift：入口是 `jmsms.thrift`
+- **IDL 目录 ↔ 生成包名 ↔ 模型目录名一一对应**：本仓单词汇摊平在 `idl/`，
+  包名由全目录一致的 `namespace go jmsms` 命名，生成的包必须叫 `jmsms`、
+  放在叫 `jmsms` 的目录里（守卫 pkg/arch 认平铺与嵌套两种布局）。契约按域拆成同目录多份
+  thrift：入口是 `jmsms.thrift`
   （include 各域文件），**每一份**都声明 `namespace go jmsms` —— 拆的是文件，
   不是词汇，生成物仍是一个包、类型名不变（跨文件引用要写 `域名.类型名`，
   且 `gen-idl.sh` 必须带 `-r`，否则 include 的文件没有生成物）。
@@ -402,7 +404,7 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
    「这个 server 给我哪些工具」变了，就是变了。
    ⚠️ 同一个测试还查**目录与注册表一致**：策略表里有、注册表里没有（或反过来）都红。
 
-2. **契约域是 17 个。** `idl/jmsms/` 下按域拆的 thrift：
+2. **契约域是 17 个。** `idl/`（摊平布局）下按域拆的 thrift：
    `account` / `asset` / `automation` / `cmdfilter` / `delegation` / `evidence` /
    `gather` / `job` / `network` / `permission` / `rbac` / `records` / `refs` /
    `security` / `status` / `touch` / `user`（外加入口 `jmsms.thrift`）。
