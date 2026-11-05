@@ -8,8 +8,6 @@ package repository
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
 
@@ -79,24 +77,12 @@ func (c *Client) GatheredUsernames(ctx context.Context, assetID string) map[stri
 }
 
 func (c *Client) GatherAdhoc(ctx context.Context, assetID string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET",
-		c.BaseURL+"/api/v1"+string(jmsapi.ResGatherAdhoc)+"?asset_id="+assetID, nil)
+	// The report is HTML, not JSON, so it goes through the binary fetch —
+	// same reason as DownloadReplayText: the credential's own header, and a
+	// refused credential reported as itself.
+	raw, err := c.GetBinary(ctx, string(jmsapi.ResGatherAdhoc)+"?asset_id="+assetID)
 	if err != nil {
 		return "", err
-	}
-	req.Header.Set("Authorization", "Token "+c.Token)
-	resp, err := c.HTTP.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("HTTP %d from the adhoc gather endpoint: %s",
-			resp.StatusCode, jmsapi.Truncate(string(raw), 200))
 	}
 	return jmsapi.HTMLToText(raw), nil
 }

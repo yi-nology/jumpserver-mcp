@@ -315,7 +315,7 @@ func aclLookup(ctx context.Context, c *repository.Client, resource jmsapi.Resour
 	if repository.IsUUID(ref) {
 		return ref, nil
 	}
-	rows, _, err := c.ListAllCounted(ctx, string(resource), nil)
+	rows, _, err := c.ListCounted(ctx, resource, nil)
 	if err != nil {
 		return "", err
 	}
@@ -524,7 +524,7 @@ func RegisterDataMaskingTools(r *reg.Registry, c *repository.Client) {
 			"new rule does not duplicate or contradict an existing rule.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.DataMaskingRule]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args maskingListArgs) (*mcp.CallToolResult, any, error) {
-		rows, serverTotal, err := c.ListAllCounted(ctx, string(jmsapi.ResDataMaskingRules), nil)
+		rows, serverTotal, err := c.ListCounted(ctx, jmsapi.ResDataMaskingRules, nil)
 		if err != nil {
 			return render.Err(err)
 		}
@@ -758,7 +758,7 @@ func RegisterClipboardACLTools(r *reg.Registry, c *repository.Client) {
 			"contradict an existing rule.",
 		OutputSchema: render.Schema[render.ListOf[jmsms.ClipboardACL]](),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args clipboardListArgs) (*mcp.CallToolResult, any, error) {
-		rows, serverTotal, err := c.ListAllCounted(ctx, string(jmsapi.ResClipboardACLs), nil)
+		rows, serverTotal, err := c.ListCounted(ctx, jmsapi.ResClipboardACLs, nil)
 		if err != nil {
 			return render.Err(err)
 		}

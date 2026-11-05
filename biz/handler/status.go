@@ -94,32 +94,34 @@ func RegisterStatusTools(r *reg.Registry, c *repository.Client) {
 			}
 		}
 
-		if raw := fetchRaw(c, ctx, jmsapi.ResAssets); raw != nil {
-			if rows, err := jmsapi.List(raw); err == nil {
-				byPlatform := map[string]int32{}
-				okCount, errCount := int32(0), int32(0)
-				for _, r := range rows {
-					var a map[string]any
-					if json.Unmarshal(r, &a) != nil {
-						continue
-					}
-					p, _ := jmsapi.Nested(a, "platform", "name").(string)
-					if p == "" {
-						p = "(none)"
-					}
-					byPlatform[p]++
-					switch jmsapi.Label(a, "connectivity") {
-					case "ok":
-						okCount++
-					case "err":
-						errCount++
-					}
+		// The walk, not a single fetch: a one-page read silently undercounts
+		// the estate past the server's window, and this tool is the one an
+		// agent reads first to size the fleet. The total is the SERVER's own
+		// count; the distribution is over the rows actually read.
+		if rows, serverTotal, err := c.ListCounted(ctx, jmsapi.ResAssets, url.Values{"page_size": {"500"}}); err == nil {
+			byPlatform := map[string]int32{}
+			okCount, errCount := int32(0), int32(0)
+			for _, a := range rows {
+				p := jmsapi.Str(jmsapi.Nested(a, "platform", "name"))
+				if p == "" {
+					p = "(none)"
 				}
-				out.AssetTotal = jms.OptInt32(int32(len(rows)))
-				out.AssetByPlatform = byPlatform
-				out.ConnectivityOk = jms.OptInt32(okCount)
-				out.ConnectivityErr = jms.OptInt32(errCount)
+				byPlatform[p]++
+				switch jmsapi.Label(a, "connectivity") {
+				case "ok":
+					okCount++
+				case "err":
+					errCount++
+				}
 			}
+			if serverTotal > 0 {
+				out.AssetTotal = jms.OptInt32(int32(serverTotal))
+			} else {
+				out.AssetTotal = jms.OptInt32(int32(len(rows)))
+			}
+			out.AssetByPlatform = byPlatform
+			out.ConnectivityOk = jms.OptInt32(okCount)
+			out.ConnectivityErr = jms.OptInt32(errCount)
 		}
 		return render.Text(out)
 	})

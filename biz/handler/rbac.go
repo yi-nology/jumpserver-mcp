@@ -75,7 +75,7 @@ func RegisterRBACTools(r *reg.Registry, c *repository.Client) {
 		// nothing reads as "no such permission", which is a different claim
 		// from "no permission whose name contains this". One local filter
 		// keeps the two questions distinguishable.
-		rows, serverTotal, err := c.ListAllCounted(ctx, string(jmsapi.ResRBACPermissions),
+		rows, serverTotal, err := c.ListCounted(ctx, jmsapi.ResRBACPermissions,
 			map[string][]string{"scope": {scope}})
 		if err != nil {
 			return render.Err(err)
@@ -163,7 +163,7 @@ func RegisterRBACTools(r *reg.Registry, c *repository.Client) {
 		}
 		var roles []roleRef
 		fetchRoles := func(resource jmsapi.Resource, wantScope string) error {
-			rows, _, err := c.ListAllCounted(ctx, string(resource), nil)
+			rows, _, err := c.ListCounted(ctx, resource, nil)
 			if err != nil {
 				return err
 			}
@@ -205,7 +205,7 @@ func RegisterRBACTools(r *reg.Registry, c *repository.Client) {
 		}
 		byID := map[string]*entry{}
 		catalogue := func(scopeName string) error {
-			rows, _, err := c.ListAllCounted(ctx, string(jmsapi.ResRBACPermissions),
+			rows, _, err := c.ListCounted(ctx, jmsapi.ResRBACPermissions,
 				url.Values{"scope": {scopeName}})
 			if err != nil {
 				return err
@@ -239,7 +239,7 @@ func RegisterRBACTools(r *reg.Registry, c *repository.Client) {
 		// shape is what the generator decided, not what the code wishes.
 		matrixRoles := []*jmsms.RBACMatrixRole{}
 		for _, rr := range roles {
-			rows, _, err := c.ListAllCounted(ctx, string(jmsapi.ResRBACPermissions),
+			rows, _, err := c.ListCounted(ctx, jmsapi.ResRBACPermissions,
 				url.Values{"role": {rr.id}})
 			if err != nil {
 				return render.Err(err)

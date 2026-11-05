@@ -55,13 +55,23 @@ func (c *Client) AccessSources(ctx context.Context, UserID string) (map[string][
 				if !ok {
 					continue
 				}
-				members, err := c.ListAll(ctx, string(jmsapi.ResGroups)+convert.AnyToStr(gm["id"])+"/")
-				if err != nil {
+				// The group's DETAIL carries its members — as bare ids
+				// (PrimaryKeyRelatedField) on the versions in the field.
+				// Listing "/users/groups/<id>/" instead hit the DETAIL
+				// route with a LIST reader, which ShapeError'd and made
+				// every group-held permission silently invisible.
+				var gdetail map[string]any
+				if err := c.Do(ctx, "GET", string(jmsapi.ResGroups)+convert.AnyToStr(gm["id"])+"/", nil, nil, &gdetail); err != nil {
 					continue
 				}
-				for _, mem := range members {
-					if convert.AnyToStr(mem["id"]) == UserID {
+				for _, u := range jmsapi.AsSlice(gdetail["users"]) {
+					if convert.AnyToStr(u) == UserID {
 						holds = true
+						break
+					}
+					if m, ok := u.(map[string]any); ok && convert.AnyToStr(m["id"]) == UserID {
+						holds = true
+						break
 					}
 				}
 			}

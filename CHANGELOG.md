@@ -11,6 +11,29 @@
 
 ### 修复
 
+## [0.10.0] - 2026-11-05
+
+### 修复
+
+- **回放下载/Adhoc 采集改走底座 GetBinary**：两处原先手拼 `Authorization: Token `+token——
+  登录凭据下（v4 的唯一路径）是空 key 必 401，且 401 的 JSON 体被送进 tar 读成
+  "unexpected EOF"。现在走与 JSON 调用相同的凭据（自动刷新 Bearer）、限流与状态检查。
+- **AccessSources 的组授权不再静默丢失**：原先对组详情路由用列表解析（ShapeError 即跳过），
+  "只经由组拿到的授权"永远答不出 held；改读组详情的 members。
+- **jms_user_groups_list 改读授权详情**：列表行的 user_groups 实测恒 null，"组持有哪些
+  授权"此前恒空答。
+- **jms_status 资产计数改翻页**：单页抓取在超窗口部署上静默少报；改走 ListAllCounted，
+  总数用服务器自己的 count。
+- **jms_security_review 不再把"封禁列表读不到"当"没有封禁"**：未知降级为 Warn 并明说，
+  不再指示去封禁一个可能已在列表上的地址。
+- jms_asset_evidence 的 Note 不再相互覆盖（资产已删除 + 有跳过会话时两个事实都在）。
+- jms_access_matrix 的排序修复（原对空 key 的 sort 是死代码）。
+
+### 变更
+
+- 危险命令分类随底座 v0.7.0 变严（同执行面）；工具层 9 处裸路径调用改走网关形状的
+  ListCounted（底座新增，rawCalls 守卫补登后抓到的存量违规）。
+
 ## [0.9.0] - 2026-11-05
 
 ### 变更

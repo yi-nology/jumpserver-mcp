@@ -186,14 +186,22 @@ func RegisterGroupTools(r *reg.Registry, c *repository.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		// Which permissions hold which groups.
+		// Which permissions hold which groups. The LIST rows carry
+		// user_groups as null on the deployments in the field (measured:
+		// v5-api-traps §3) — the membership only shows on each permission's
+		// DETAIL, which is what the doctor reads. Listing without the detail
+		// fetch made every group-held grant answer as "held by nothing".
 		perms, err := c.List(ctx, jmsapi.ResPermissions)
 		if err != nil {
 			perms = nil
 		}
 		holds := map[string][]string{}
 		for _, p := range perms {
-			for _, g := range jmsapi.AsSlice(p["user_groups"]) {
+			var detail map[string]any
+			if err := c.Get(ctx, jmsapi.ResPermissions, jmsapi.Str(p["id"]), &detail); err != nil {
+				continue
+			}
+			for _, g := range jmsapi.AsSlice(detail["user_groups"]) {
 				if m, ok := g.(map[string]any); ok {
 					id := jmsapi.Str(m["id"])
 					holds[id] = append(holds[id], jmsapi.Str(p["name"]))

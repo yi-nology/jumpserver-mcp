@@ -94,7 +94,7 @@ func RegisterTransferTools(r *reg.Registry, c *repository.Client) {
 		// the WINDOW: when only the newest N rows are read, the server has
 		// to hand over the NEWEST ones.
 		q := url.Values{"order": {"-date_start"}}
-		rows, serverTotal, err := c.ListAllCounted(ctx, string(jmsapi.ResFTPLogs), q)
+		rows, serverTotal, err := c.ListCounted(ctx, jmsapi.ResFTPLogs, q)
 		if err != nil {
 			return render.Err(err)
 		}

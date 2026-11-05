@@ -310,11 +310,18 @@ func RegisterSecurityReview(r *reg.Registry, c *repository.Client) {
 		}
 
 		blocked := []string{}
+		blockedUnknown := false
 		if rows, err := c.List(ctx, jmsapi.ResBlockedIPs); err == nil {
 			for _, b := range rows {
 				blocked = append(blocked, jmsapi.Str(b["ip"]))
 			}
 			sort.Strings(blocked)
+		} else {
+			// The list is unreadable (a permission the credential lacks, an
+			// XPack-only route): "unknown" must not fold into "nobody is
+			// blocked" — that turns an unread blocklist into advice to
+			// block an address that may already be on it.
+			blockedUnknown = true
 		}
 		blockedSet := map[string]bool{}
 		for _, b := range blocked {
@@ -338,7 +345,7 @@ func RegisterSecurityReview(r *reg.Registry, c *repository.Client) {
 			topOffenders = append(topOffenders, jmsms.OffendingIP{
 				IP: ip, Failures: n, Successes: successes, Blocked: blockedSet[ip],
 			})
-			if !blockedSet[ip] {
+			if !blockedSet[ip] && !blockedUnknown {
 				unblocked = append(unblocked, ip)
 			}
 		}
@@ -378,6 +385,12 @@ func RegisterSecurityReview(r *reg.Registry, c *repository.Client) {
 			})
 		}
 		switch {
+		case blockedUnknown:
+			checks = append(checks, &jms.Check{
+				Name: "repeat_failed_logins", Status: service.Warn,
+				Detail: "the Block IP list could not be read, so whether the offending addresses are blocked is UNKNOWN — they are listed with blocked=false, which means \"not on the list we could not read\", not \"unblocked\"",
+				Fix: service.FixText("grant the credential read access to the block list, then re-run; until then check the addresses by hand"),
+			})
 		case len(unblocked) > 0:
 			checks = append(checks, &jms.Check{
 				Name: "repeat_failed_logins", Status: service.Fail,

@@ -262,19 +262,19 @@ func RegisterEvidenceTools(r *reg.Registry, c *repository.Client) {
 			SessionsWithEvidence: len(evidence),
 			CommandsReported:     commandTotal,
 		}
+		notes := []string{}
 		if deleted {
 			res.AssetDeletedFromBastion = true
-			res.Note = "this asset is no longer registered on the bastion; the trail below comes from " +
-				"the sessions it left behind."
+			notes = append(notes, "this asset is no longer registered on the bastion; the trail below comes from "+
+				"the sessions it left behind.")
 		}
 		if skipped := len(mine) - len(evidence); skipped > 0 {
 			res.SessionsWithoutEvidence = skipped
-			res.Note = fmt.Sprintf("%d session(s) on this asset carry an error_reason and were left out: "+
-				"they recorded a half-finished handshake, not real activity. Sessions are reported "+
-				"newest first and the list is capped at %d.", skipped, limit)
-		} else {
-			res.Note = fmt.Sprintf("Sessions are reported newest first and the list is capped at %d.", limit)
+			notes = append(notes, fmt.Sprintf("%d session(s) on this asset carry an error_reason and were left out: "+
+				"they recorded a half-finished handshake, not real activity.", skipped))
 		}
+		notes = append(notes, fmt.Sprintf("Sessions are reported newest first and the list is capped at %d.", limit))
+		res.Note = strings.Join(notes, " ")
 		// The blind spots: sessions that carried a real interaction but left
 		// no command row. They are listed on their own because they are the
 		// part of the trail the command log cannot speak for -- and a long

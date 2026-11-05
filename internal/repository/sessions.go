@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"sort"
 	"strings"
 
@@ -57,19 +56,12 @@ func (c *Client) SessionAssetIDs(ctx context.Context, ref string) ([]string, []m
 }
 
 func (c *Client) DownloadReplayText(ctx context.Context, sessionID string) (string, error) {
-	// The REST helper marshals to JSON, so fetch the archive separately.
-	req, err := http.NewRequestWithContext(ctx, "GET",
-		c.BaseURL+"/api/v1"+string(jmsapi.ResSessions)+sessionID+"/replay/download/", nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Authorization", "Token "+c.Token)
-	resp, err := c.HTTP.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
+	// The archive is not JSON, so it goes through the binary fetch — which
+	// also carries the credential's own header. Hand-building "Token "+token
+	// here sent "Token " with an EMPTY key under a login credential (v4's
+	// only option), and the 401 that came back was read as a tar stream and
+	// reported "unexpected EOF" instead of a refused credential.
+	raw, err := c.GetBinary(ctx, string(jmsapi.ResSessions)+sessionID+"/replay/download/")
 	if err != nil {
 		return "", err
 	}

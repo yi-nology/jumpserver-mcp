@@ -165,7 +165,9 @@ func RegisterCoverageTools(r *reg.Registry, c *repository.Client) {
 				}
 			}
 		}
-		sort.Strings(heldBy[""])
+		for id := range heldBy {
+			sort.Strings(heldBy[id])
+		}
 
 		// The per-user reach has to be read for EVERY candidate user before
 		// the cap: the answer is sorted by reach, and "the top N by reach"
