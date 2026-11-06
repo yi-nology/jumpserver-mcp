@@ -397,13 +397,43 @@ AGENTS.md §4.1（协议层）。**管理面的实例**：`jms_file_transfers` �
 
 ## 3. 管理面专属铁律
 
+<!-- tools:mgmt -->
 1. **工具数是 97，被测试钉住。**
+   97 个工具的名字全集（守卫核对用，改工具要同步这里）：
+
+   `jms_access_matrix` / `jms_account_automation_create` / `jms_account_automation_executions` / `jms_account_automation_records`
+   `jms_account_automation_run` / `jms_account_automations_list` / `jms_account_create` / `jms_account_delete`
+   `jms_account_update` / `jms_accounts_list` / `jms_asset_audit` / `jms_asset_create`
+   `jms_asset_delete` / `jms_asset_evidence` / `jms_asset_get` / `jms_asset_move`
+   `jms_asset_touch_history` / `jms_asset_update` / `jms_assets_bulk_create` / `jms_assets_list`
+   `jms_clipboard_acl_create` / `jms_clipboard_acl_delete` / `jms_clipboard_acl_update` / `jms_clipboard_acls`
+   `jms_cmdfilter_create` / `jms_cmdfilter_delete` / `jms_cmdfilter_list` / `jms_cmdgroup_create`
+   `jms_cmdgroup_delete` / `jms_cmdgroup_list` / `jms_command_audit` / `jms_command_guard`
+   `jms_commands_search` / `jms_connectivity_check` / `jms_data_masking_rule_create` / `jms_data_masking_rule_delete`
+   `jms_data_masking_rule_update` / `jms_data_masking_rules` / `jms_delegation_call` / `jms_delegation_probe`
+   `jms_delegation_status` / `jms_doctor` / `jms_file_transfers` / `jms_gather_apply`
+   `jms_gather_run` / `jms_gathered_accounts` / `jms_job_audit` / `jms_job_list`
+   `jms_job_run` / `jms_job_status` / `jms_job_stop` / `jms_label_attach`
+   `jms_label_create` / `jms_label_delete` / `jms_label_resources` / `jms_labels_list`
+   `jms_login_acl_create` / `jms_login_acl_delete` / `jms_login_acl_update` / `jms_login_asset_check`
+   `jms_login_logs` / `jms_net_gateways_list` / `jms_net_path` / `jms_net_zones_list`
+   `jms_nodes_create` / `jms_nodes_list` / `jms_operate_logs` / `jms_password_change_logs`
+   `jms_permission_compare` / `jms_permission_coverage` / `jms_permission_create` / `jms_permission_delete`
+   `jms_permission_get` / `jms_permission_grant` / `jms_permissions_list` / `jms_platforms_list`
+   `jms_rbac_permissions` / `jms_rbac_role_matrix` / `jms_role_permissions` / `jms_roles_list`
+   `jms_security_review` / `jms_session_replay` / `jms_session_terminate` / `jms_session_transcript`
+   `jms_sessions_list` / `jms_sessions_live` / `jms_status` / `jms_system_role_permissions`
+   `jms_terminals_list` / `jms_user_access` / `jms_user_create` / `jms_user_groups_list`
+   `jms_user_password_set` / `jms_user_set_active` / `jms_user_sshkey_add` / `jms_user_sshkey_remove`
+   `jms_users_list`
+   上面这份清单与工具表一致性守卫（`check_tool_docs.py`）机械核对。
    `biz/router/policy_test.go` 的 `TestToolCount` 直接写死
    `if got := len(r.Specs()); got != 97` ⇒ 加一个工具**必须**改这个数（连同
    README 与 skills 里引用的数字）。⚠️ 这个数**是给 agent 的契约**，不是内部计数：
    「这个 server 给我哪些工具」变了，就是变了。
    ⚠️ 同一个测试还查**目录与注册表一致**：策略表里有、注册表里没有（或反过来）都红。
 
+<!-- /tools:mgmt -->
 2. **契约域是 17 个。** `idl/`（摊平布局）下按域拆的 thrift：
    `account` / `asset` / `automation` / `cmdfilter` / `delegation` / `evidence` /
    `gather` / `job` / `network` / `permission` / `rbac` / `records` / `refs` /
